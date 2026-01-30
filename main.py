@@ -23,7 +23,7 @@ ORDER_SIZE_USDT = 10
 PROFIT_TARGET = 1000
 ROUND_LEVEL_STEP = 1000
 ROUND_LEVEL_OFFSET = 900
-DATA_FILE = "positions.json"
+POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 
 # Ініціалізація сесії та активних позицій
@@ -38,15 +38,15 @@ def get_symbol_precision(symbol):
     return len(res.split('.')[1]) if '.' in res else 0
 
 def save_positions():
-    with open(DATA_FILE, "w") as f:
+    with open(POSITIONS_FILE, "w") as f:
         json.dump(active_positions, f, indent=4)
 
 def load_positions(precision):
     print("⚓ Відновлення позицій...")
     global active_positions
-    if os.path.exists(DATA_FILE):
+    if os.path.exists(POSITIONS_FILE):
         print("🔍 Відновлюємо позиції з локального файлу...")
-        with open(DATA_FILE, "r") as f:
+        with open(POSITIONS_FILE, "r") as f:
             active_positions = json.load(f)
         if not active_positions:
             print("⚠️ Позицій для відновлення не знайдено.")
