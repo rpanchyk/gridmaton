@@ -22,7 +22,7 @@ SYMBOL = "BTCUSDT"
 ORDER_SIZE_USDT = 10
 PROFIT_TARGET = 1000
 ROUND_LEVEL_STEP = 1000
-ROUND_LEVEL_OFFSET = 200
+ROUND_LEVEL_OFFSET = 900
 DATA_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 
@@ -86,7 +86,7 @@ def load_positions(precision):
 
 def check_and_execute_buy(last_price, current_price, precision):
     global active_positions
-    level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+    level = (last_price // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
     
     # Перевірка умови перетину рівня та відсутності дублікатів
     if last_price > level and current_price <= level:
@@ -126,17 +126,20 @@ def check_and_execute_buy(last_price, current_price, precision):
                             
                             if status == "Filled":
                                 # Отримуємо реальні дані виконання
-                                exec_qty = float(order_data.get('qty', 0))
+                                exec_qty = float(order_data.get('cumExecQty', 0))
                                 exec_price = float(order_data.get('avgPrice', current_price))
-                                
-                                # Віднімаємо комісію (наприклад, 0.1%) та округлюємо згідно з precision
-                                # Використовуємо 0.999 для безпеки, щоб не виставити на продаж більше, ніж є
-                                q_net = math.floor((exec_qty * 0.999) * (10**precision)) / (10**precision)
+                                commission = float(order_data.get('cumExecFee', 0))
+
+                                exec_qty = exec_qty - commission  # Віднімаємо комісію в BTC
+
+                                # Округлюємо кількість ВНИЗ до потрібної точності
+                                factor = 10 ** precision
+                                exec_qty = math.floor(exec_qty * factor) / factor
                                 
                                 # Додаємо в список активних позицій
                                 new_pos = {
                                     "buy_price": exec_price, 
-                                    "qty": format(q_net, f'.{precision}f')
+                                    "qty": format(exec_qty, f'.{precision}f')
                                 }
                                 active_positions.append(new_pos)
                                 save_positions()
@@ -144,7 +147,9 @@ def check_and_execute_buy(last_price, current_price, precision):
                                 # Записуємо в лог-файл
                                 log_trade(new_pos, "BUY", exec_price)
                                 
-                                print(f"📥 Успішно куплено {q_net} {SYMBOL} по ціні {exec_price}")
+                                print(f"📥 Успішно куплено {exec_qty} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}", end="")
+                                print(f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {SYMBOL.replace('BTC', '')}", end="")
+                                print(f" включно з комісією {format(commission * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}.")
                                 is_filled = True
                                 break
                             elif status in ["Cancelled", "Rejected"]:
@@ -174,11 +179,10 @@ def check_and_execute_sell(current_price, precision):
                     print(f"Баланс {base_coin}: {coins}")
 
                     # Округлюємо кількість ВНИЗ до потрібної точності
-                    # (використовуємо floor, щоб не спробувати продати більше, ніж є)
                     factor = 10 ** precision
                     
                     # Отримуємо доступний баланс (availableToWithdraw або free)
-                    available_balance = float(coins[0].get('walletBalance', "0"))
+                    available_balance = float(coins[0].get('walletBalance', 0))
                     available_balance = math.floor(available_balance * factor) / factor
                     print(f"Доступний баланс {base_coin}: {available_balance}")
                     
@@ -289,7 +293,9 @@ def handle_message(message):
         last_price = current_price
         
         # Розрахунок наступних рівнів для виводу
-        next_buy_level = ((current_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+        next_buy_level = (last_price // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+        if any(abs(p['buy_price'] - next_buy_level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
+            next_buy_level -= ROUND_LEVEL_STEP
         next_buy_level_str = f"{next_buy_level:.2f}"
         next_sell_price_str = "немає"
         if active_positions:
