@@ -1,3 +1,5 @@
 pybit
 requests
 python-dotenv
+aiohttp
+websockets
