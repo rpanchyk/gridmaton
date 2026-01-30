@@ -86,7 +86,7 @@ def load_positions(precision):
 
 def check_and_execute_buy(last_price, current_price, precision):
     global active_positions
-    level = (last_price // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+    level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
     
     # Перевірка умови перетину рівня та відсутності дублікатів
     if last_price > level and current_price <= level:
@@ -293,7 +293,7 @@ def handle_message(message):
         last_price = current_price
         
         # Розрахунок наступних рівнів для виводу
-        next_buy_level = (last_price // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+        next_buy_level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
         if any(abs(p['buy_price'] - next_buy_level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
             next_buy_level -= ROUND_LEVEL_STEP
         next_buy_level_str = f"{next_buy_level:.2f}"
