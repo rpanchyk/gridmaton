@@ -1,9 +1,12 @@
 # Gridmaton
+
 Automated Crypto Trading Bot
 
-## Goal
+![Logo](logo.png)
 
-Gridmaton is an automated cryptocurrency trading bot designed to execute algorithmic trades on the crypto exchange on Spot market. It monitors price movements of crypto assets (default: BTCUSDT) and automatically places buy orders when prices cross predefined support levels, then sells at target profit levels. The bot implements a grid trading strategy with configurable round levels and profit targets, maintaining active positions in a JSON file for persistence and recovery.
+## Introduction
+
+**Gridmaton** is an automated cryptocurrency trading bot designed to execute algorithmic trades on the crypto exchange on Spot market. It monitors price movements of crypto assets (default: BTCUSDT) and automatically places buy orders when prices cross predefined support levels, then sells at target profit levels. The bot implements a grid trading strategy with configurable round levels and profit targets, maintaining active positions in a JSON file for persistence and recovery.
 
 ## Prerequisites
 
