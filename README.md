@@ -142,23 +142,24 @@ cat positions.json
 **⚠️ WARNING: TRADING INVOLVES SUBSTANTIAL RISK OF LOSS**
 
 1. **Use at Your Own Risk** - This bot is provided as-is without any warranties. Use it entirely at your own risk. Past performance does not guarantee future results.
-
 2. **Real Money Risk** - When `DEMO_MODE` is set to `False`, this bot will execute real trades using real funds. Incorrect configuration or unexpected market conditions can result in significant financial losses.
-
 3. **Not Financial Advice** - This bot is not intended as financial advice. Do not use it to trade with funds you cannot afford to lose.
-
 4. **Test Thoroughly** - Always test the bot extensively in demo mode before using it with real money. Verify API credentials and trading parameters carefully.
-
 5. **API Key Security** - Never share your `.env` file or API credentials. Treat them as sensitive information. Use API keys with restricted trading permissions if possible.
-
 6. **Network Risk** - The bot relies on continuous internet connectivity. Network failures may prevent position closure or trade execution.
-
 7. **Exchange Risk** - The bot depends on Bybit exchange availability and API reliability. Exchange outages or API changes may affect operation.
-
 8. **Bugs and Issues** - While efforts have been made to ensure accuracy, bugs may exist. Monitor the bot's activity regularly.
-
 9. **Market Risk** - Volatile market conditions can lead to rapid price movements and unexpected trading outcomes, especially during volatile periods.
-
 10. **Compliance** - Ensure compliance with local regulations and your country's cryptocurrency trading laws before using this bot.
 
-**By using this bot, you acknowledge that you have read this disclaimer and assume full responsibility for any trading losses or outcomes.**
+_By using this bot, you acknowledge that you have read this disclaimer and assume full responsibility for any trading losses or outcomes._
+
+## Disclaimer
+
+The software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and noninfringement. in no event shall the
+authors or copyright holders be liable for any claim, damages or other
+liability, whether in an action of contract, tort or otherwise, arising from,
+out of or in connection with the software or the use or other dealings in the
+software.
