@@ -27,7 +27,7 @@ Automated Crypto Trading Bot
 
 Copy the `.env.example` file to create your `.env` configuration file:
 
-```bash
+```shell
 cp .env.example .env
 ```
 
@@ -54,7 +54,7 @@ Install required Python packages:
 pip install -r requirements.txt
 ```
 
-### Step 4: Configure Bot Parameters (Optional)
+### Step 4: Configure Parameters (Optional)
 
 Edit `main.py` to customize trading parameters:
 
@@ -73,11 +73,11 @@ Edit `main.py` to customize trading parameters:
 
 Run the bot with:
 
-```bash
+```shell
 python main.py
 ```
 
-The bot will start and connect to the Bybit exchange. It will then monitor the price of selected coin and execute trades based on the defined strategy.
+The bot will start and connect to the exchange with the provided API credentials via WebSocket connection. It will then monitor the price of selected coin and execute trades based on the defined strategy.
 
 ### Monitor Bot Activity
 
@@ -105,7 +105,7 @@ Press `Ctrl+C` in the terminal to stop the bot gracefully.
 
 Check the `trade.log` file for detailed trading history:
 
-```bash
+```shell
 cat trade.log
 ```
 
@@ -113,7 +113,7 @@ cat trade.log
 
 Active trading positions are saved in `positions.json`:
 
-```bash
+```shell
 cat positions.json
 ```
 
