@@ -3,6 +3,7 @@ from datetime import datetime
 import math
 import json
 import os
+import requests
 from dotenv import load_dotenv
 from pybit.unified_trading import HTTP, WebSocket
 
@@ -12,6 +13,9 @@ load_dotenv()
 # Конфігурація
 API_KEY = os.getenv('API_KEY')
 API_SECRET = os.getenv('API_SECRET')
+TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in ('true', '1')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
@@ -22,7 +26,7 @@ SYMBOL = "BTCUSDT"
 ORDER_SIZE_USDT = 10
 PROFIT_TARGET = 1000
 ROUND_LEVEL_STEP = 1000
-ROUND_LEVEL_OFFSET = 900
+ROUND_LEVEL_OFFSET = 500
 POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 
@@ -144,12 +148,17 @@ def check_and_execute_buy(last_price, current_price, precision):
                                 active_positions.append(new_pos)
                                 save_positions()
                                 
+                                message = f"📥 Успішно куплено {exec_qty} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
+                                message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {SYMBOL.replace('BTC', '')}"
+                                message += f" включно з комісією {format(commission * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                print(message)
+                                
                                 # Записуємо в лог-файл
                                 log_trade(new_pos, "BUY", exec_price)
                                 
-                                print(f"📥 Успішно куплено {exec_qty} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}", end="")
-                                print(f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {SYMBOL.replace('BTC', '')}", end="")
-                                print(f" включно з комісією {format(commission * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}.")
+                                # Оповіщаємо в Telegram
+                                send_telegram(message)
+                                
                                 is_filled = True
                                 break
                             elif status in ["Cancelled", "Rejected"]:
@@ -227,18 +236,25 @@ def check_and_execute_sell(current_price, precision):
                             status = order_data['orderStatus']
                             
                             if status == "Filled":
+                                # Видаляємо позицію зі списку активних та зберігаємо файл
+                                active_positions.remove(pos)
+                                save_positions()
+                                
                                 # Отримуємо реальну ціну виконання
                                 exec_price = float(order_data.get('avgPrice', current_price))
                                 profit = (exec_price - pos['buy_price']) * float(pos['qty'])
                                 
-                                print(f"✅ Виконано! Ціна: {exec_price}, Прибуток: {profit:.2f} {SYMBOL.replace("BTC", "")}")
-                                
-                                # Видаляємо позицію зі списку активних та зберігаємо файл
-                                active_positions.remove(pos)
-                                save_positions()
+                                message = f"💰 Успішно продано {pos['qty']} {SYMBOL.replace('USDT', '')}"
+                                message += f" по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
+                                message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                message += f", прибуток {format(profit, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                print(message)
 
                                 # Записуємо в лог-файл
                                 log_trade(pos, "SELL", exec_price, profit=profit)
+                                
+                                # Оповіщаємо в Telegram
+                                send_telegram(message)
                                 
                                 is_filled = True
                                 break
@@ -271,6 +287,23 @@ def log_trade(pos, action, exec_price, profit=None):
     # Запис у файл
     with open(TRADE_LOG_FILE, "a", encoding="utf-8") as f:
         f.write(log_msg + "\n")
+
+def send_telegram(message):
+    global TELEGRAM_NOTIFICATIONS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
+
+    if not TELEGRAM_NOTIFICATIONS:
+        return
+
+    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
+        print("⚠️ Telegram токен або чат ID не встановлено.")
+        return
+
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        data = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+        requests.post(url, data=data)
+    except Exception as e:
+        print(f"Помилка Telegram: {e}")
 
 def handle_message(message):
     global last_price

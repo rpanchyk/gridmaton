@@ -39,11 +39,14 @@ Copy-Item .env.example .env
 
 ### Step 2: Add Your API Credentials
 
-Edit the `.env` file and add your Bybit API credentials:
+Edit the `.env` file and add your Bybit API credentials and other settings:
 
 ```
 API_KEY=your_api_key
 API_SECRET=your_api_secret
+TELEGRAM_NOTIFICATIONS=False
+TELEGRAM_TOKEN=your_telegram_bot_token
+TELEGRAM_CHAT_ID=your_telegram_chat_id
 ```
 
 ### Step 3: Install Dependencies
@@ -65,7 +68,7 @@ Edit `main.py` to customize trading parameters:
 | `ORDER_SIZE_USDT`    | `10`      | Size of each buy order in USDT              |
 | `PROFIT_TARGET`      | `1000`    | Profit target per position (in price units) |
 | `ROUND_LEVEL_STEP`   | `1000`    | Distance between buy levels                 |
-| `ROUND_LEVEL_OFFSET` | `900`     | Offset adjustment for buy levels            |
+| `ROUND_LEVEL_OFFSET` | `500`     | Offset adjustment for buy levels            |
 
 ## Usage
 
@@ -130,16 +133,45 @@ cat positions.json
 
 ## Files Overview
 
+- **.env** - API credentials and configuration (create from .env.example)
+- **.env.example** - Example environment configuration file
+- **.gitignore** - Git ignore file to exclude sensitive files
+- **LICENSE** - License information for the project
+- **logo.png** - Bot logo image
 - **main.py** - Main bot application with trading logic
 - **positions.json** - Current active trading positions (auto-managed)
-- **trade.log** - Historical record of all executed trades
-- **.env** - API credentials and configuration (create from .env.example)
-- **requirements.txt** - Python package dependencies
 - **README.md** - This documentation
+- **requirements.txt** - Python package dependencies
+- **trade.log** - Historical record of all executed trades
 
-## Attention
+## Development
 
-**⚠️ WARNING: TRADING INVOLVES SUBSTANTIAL RISK OF LOSS**
+To update `requirements.txt` after code changes, run:
+
+```shell
+pip install pipreqs
+pipreqs . --force  --encoding=utf-8 --mode no-pin
+```
+
+## Known Issues
+
+- The issue with connection to exchange:
+
+```
+WebSocket Unified V5 (Auth) (wss://stream.bybit.com/v5/public/spot) connection failed. 
+Too many connection attempts. pybit will no longer try to reconnect
+```
+
+This issue can be fixed by installing or upgrading system certificates:
+
+```shell
+python -m pip install --upgrade certifi
+python -m pip install --upgrade pip-system-certs
+```
+
+## Warning
+
+**⚠️ TRADING INVOLVES SUBSTANTIAL RISK OF LOSS**
 
 1. **Use at Your Own Risk** - This bot is provided as-is without any warranties. Use it entirely at your own risk. Past performance does not guarantee future results.
 2. **Real Money Risk** - When `DEMO_MODE` is set to `False`, this bot will execute real trades using real funds. Incorrect configuration or unexpected market conditions can result in significant financial losses.
