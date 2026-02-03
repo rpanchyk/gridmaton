@@ -1,0 +1,48 @@
+# Docs
+# https://github.com/softprops/action-gh-release
+
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    # branches: ["main"]
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            osname: linux
+            asset_name: ${{ github.event.repository.name }}.zip
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Zip asset
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: .env.example main.py requirements.txt
+          dest: dist/${{ github.event.repository.name }}.zip
+
+      - name: Make release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: dist/${{ matrix.asset_name }}
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}
+          overwrite: true
