@@ -47,19 +47,19 @@ def get_symbol_precision(symbol):
     res = info['result']['list'][0]['lotSizeFilter']['basePrecision']
     return len(res.split('.')[1]) if '.' in res else 0
 
-def save_positions():
-    """
-    Зберігає активні позиції у файлі.
-    """
-    global active_positions
-    with open(POSITIONS_FILE, "w") as f:
-        json.dump(active_positions, f, indent=4)
-
 def load_positions(precision):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     :param precision: Кількість знаків після коми для округлення кількості
     """
+    # Отримання балансу монети
+    base_coin = SYMBOL.replace("USDT", "")
+    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
+    if balance_info.get('retCode') != 0:
+        raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
+    holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+    print(f"💲 Баланс: {holding_qty} {base_coin}")
+
     print("⚓ Відновлення позицій...")
     global active_positions
     if os.path.exists(POSITIONS_FILE):
@@ -73,14 +73,6 @@ def load_positions(precision):
 
     print("🔍 Відновлюємо позиції з API...")
     try:
-        # Отримання балансу монети
-        base_coin = SYMBOL.replace("USDT", "")
-        balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
-        if balance_info.get('retCode') != 0:
-            raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
-        holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-        print(f"💲 Баланс: {holding_qty} {base_coin}")
-
         # Отримання історії ордерів
         history = session.get_order_history(
             category="spot",
@@ -119,6 +111,14 @@ def load_positions(precision):
             save_positions()
     except Exception as e:
         print(f"❌ Помилка відновлення: {e}")
+
+def save_positions():
+    """
+    Зберігає активні позиції у файлі.
+    """
+    global active_positions
+    with open(POSITIONS_FILE, "w") as f:
+        json.dump(active_positions, f, indent=4)
 
 def check_and_execute_buy(last_price, current_price, precision):
     """
