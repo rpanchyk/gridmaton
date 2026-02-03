@@ -6,7 +6,7 @@ Automated Crypto Trading Bot
 
 ## Introduction
 
-**Gridmaton** is an automated cryptocurrency trading bot designed to execute algorithmic trades on the crypto exchange on Spot market. It monitors price movements of crypto assets (default: BTCUSDT) and automatically places buy orders when prices cross predefined support levels, then sells at target profit levels. The bot implements a grid trading strategy with configurable round levels and profit targets, maintaining active positions in a JSON file for persistence and recovery.
+**Gridmaton** is an automated cryptocurrency trading bot designed to execute algorithmic trades on the crypto exchange on Spot market. It monitors price movements of crypto assets (default: BTCUSDT) and automatically places buy orders when prices cross predefined support levels, then sells at target profit levels. The bot implements a grid trading strategy with configurable levels and profit targets, maintaining active positions in a JSON file for persistence and recovery.
 
 ## Prerequisites
 
@@ -41,7 +41,7 @@ Copy-Item .env.example .env
 
 Edit the `.env` file and add your Bybit API credentials and other settings:
 
-```
+```dotenv
 API_KEY=your_api_key
 API_SECRET=your_api_secret
 TELEGRAM_NOTIFICATIONS=False
@@ -94,7 +94,7 @@ The bot will display real-time information in the console:
 
 ```
 🟢 Бот запущений та готовий до торгівлі BTCUSDT.
-🤺 Точність символу BTCUSDT: 8 знаків після коми.
+🤺 Точність символу BTCUSDT: 6 знаків після коми.
 📢 Активні позиції (1 шт.): [{"buy_price": 83888.1, "qty": "0.000119"}]
 🔄 Підключення до біржи виконано успішно.
 Минула ціна: 83900.00 | Поточна ціна: 83905.00 | Позицій: 1 | Наст.купівля: 82900.00 | Наст.продаж: 84900.00
@@ -146,11 +146,11 @@ cat positions.json
 
 ## Development
 
-To update `requirements.txt` after code changes, run:
+To update `requirements.txt` after code changes with new dependencies, run:
 
 ```shell
 pip install pipreqs
-pipreqs . --force  --encoding=utf-8 --mode no-pin
+pipreqs . --force --encoding=utf-8 --mode no-pin
 ```
 
 ## Known Issues

@@ -17,6 +17,7 @@ TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
+# Перевірка наявності ключів API
 if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
 
@@ -35,6 +36,11 @@ session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SE
 active_positions = []
 
 def get_symbol_precision(symbol):
+    """
+    Отримання точності символу.
+    :param symbol: Символ
+    :return: Точність символу
+    """
     info = session.get_instruments_info(category="spot", symbol=symbol)
     if len(info['result']['list']) == 0:
         raise ValueError("Невірний символ або відсутня інформація про нього.")
@@ -42,10 +48,18 @@ def get_symbol_precision(symbol):
     return len(res.split('.')[1]) if '.' in res else 0
 
 def save_positions():
+    """
+    Зберігає активні позиції у файлі.
+    """
+    global active_positions
     with open(POSITIONS_FILE, "w") as f:
         json.dump(active_positions, f, indent=4)
 
 def load_positions(precision):
+    """
+    Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
+    :param precision: Кількість знаків після коми для округлення кількості
+    """
     print("⚓ Відновлення позицій...")
     global active_positions
     if os.path.exists(POSITIONS_FILE):
@@ -89,6 +103,12 @@ def load_positions(precision):
         print(f"❌ Помилка відновлення: {e}")
 
 def check_and_execute_buy(last_price, current_price, precision):
+    """
+    Перевіряє ціну та виконує купівлю, якщо ціна перетинає рівень і немає активних позицій на цьому рівні.
+    :param last_price: Остання ціна для визначення рівня
+    :param current_price: Поточна ціна для порівняння з рівнем
+    :param precision: Кількість знаків після коми для округлення кількості
+    """
     global active_positions
     level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
     
@@ -116,7 +136,7 @@ def check_and_execute_buy(last_price, current_price, precision):
                     for _ in range(5):
                         time.sleep(1) # Затримка перед перевіркою
                         
-                        # Перевіряємо через історію ордерів (найбільш надійно)
+                        # Перевіряємо через історію ордерів
                         check = session.get_order_history(
                             category="spot",
                             symbol=SYMBOL,
@@ -174,6 +194,11 @@ def check_and_execute_buy(last_price, current_price, precision):
                 print(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
 
 def check_and_execute_sell(current_price, precision):
+    """
+    Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
+    :param current_price: Поточна ціна для порівняння з рівнями продажу
+    :param precision: Кількість знаків після коми для округлення
+    """
     global active_positions
     for pos in active_positions[:]:
         if current_price >= pos['buy_price'] + PROFIT_TARGET:
@@ -291,6 +316,10 @@ def log_trade(pos, action, exec_price, profit=None):
         f.write(log_msg + "\n")
 
 def send_telegram(message):
+    """
+    Відправка повідомлення в Telegram.
+    :param message: Текст повідомлення
+    """
     global TELEGRAM_NOTIFICATIONS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
 
     if not TELEGRAM_NOTIFICATIONS:
@@ -308,7 +337,11 @@ def send_telegram(message):
         print(f"Помилка Telegram: {e}")
 
 def handle_message(message):
-    global last_price
+    """
+    Обробка повідомлень з WebSocket стріму тікерів.
+    :param message: Дані повідомлення
+    """
+    global precision, active_positions, last_price
     try:
         # Обробка повідомлення тікера
         data = message['data']
@@ -349,6 +382,10 @@ def handle_message(message):
         print(f"❌ Помилка в обробці WebSocket повідомлення: {e}")
 
 def main():
+    """
+    Головна функція для запуску бота.
+    Вона ініціалізує з'єднання, завантажує позиції та підписується на стрім тікерів.
+    """
     print(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}.")
 
     # Отримання точності символу
@@ -390,5 +427,6 @@ def main():
     except KeyboardInterrupt:
         print("🔴 Бот зупинено.")
 
+# Точка входу
 if __name__ == "__main__":
     main()
