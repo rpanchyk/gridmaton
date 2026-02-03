@@ -107,8 +107,7 @@ def load_positions(precision):
 
         if not active_positions:
             print("⚠️ Позицій для відновлення не знайдено.")
-        else:
-            save_positions()
+        save_positions()
     except Exception as e:
         print(f"❌ Помилка відновлення: {e}")
 
