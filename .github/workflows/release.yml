@@ -20,7 +20,7 @@ jobs:
         include:
           - os: ubuntu-latest
             osname: linux
-            asset_name: ${{ github.event.repository.name }}-${{ env.VERSION }}.zip
+            asset_name: ${{ github.event.repository.name }}-${GITHUB_REF#refs/tags/}.zip
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -31,9 +31,6 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Get version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Zip asset
         uses: vimtor/action-zip@v1.2
