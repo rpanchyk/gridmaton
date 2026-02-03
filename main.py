@@ -58,7 +58,7 @@ def load_positions(precision):
     if balance_info.get('retCode') != 0:
         raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
     holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-    print(f"💲 Баланс: {holding_qty} {base_coin}")
+    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {base_coin}")
 
     print("⚓ Відновлення позицій...")
     global active_positions
