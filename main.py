@@ -73,7 +73,7 @@ def load_positions(precision):
     
     print("🔍 Відновлюємо позиції з API...")
     try:
-        history = session.get_executions(category="spot", symbol=SYMBOL, limit=100)
+        history = session.get_executions(category="spot", symbol=SYMBOL, execType="Trade", limit=100)
         trades = history['result']['list']
         
         buys = [t for t in trades if t['side'] == 'Buy']
@@ -90,6 +90,7 @@ def load_positions(precision):
                 if remaining > 0.0001:
                     safe_qty = math.floor((remaining * 0.999) * (10**precision)) / (10**precision)
                     restored.append({
+                        "date": datetime.fromtimestamp(int(b['execTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                         "buy_price": float(b['execPrice']),
                         "qty": format(safe_qty, f'.{precision}f')
                     })
@@ -162,6 +163,7 @@ def check_and_execute_buy(last_price, current_price, precision):
                                 
                                 # Додаємо в список активних позицій
                                 new_pos = {
+                                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                                     "buy_price": exec_price, 
                                     "qty": format(exec_qty, f'.{precision}f')
                                 }
@@ -270,11 +272,17 @@ def check_and_execute_sell(current_price, precision):
                                 # Отримуємо реальну ціну виконання
                                 exec_price = float(order_data.get('avgPrice', current_price))
                                 profit = (exec_price - pos['buy_price']) * float(pos['qty'])
+
+                                # Отримуємо час виконання
+                                exec_time = order_data.get('execTime', 0)
+                                exec_time = datetime.fromtimestamp(int(exec_time)/1000) if exec_time else datetime.now()
+                                timedelta = exec_time - datetime.strptime(pos['date'], '%Y-%m-%d %H:%M:%S')
                                 
-                                message = f"💰 Успішно продано {pos['qty']} {SYMBOL.replace('USDT', '')}"
-                                message += f" по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
-                                message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                message = f"💰 Продано {pos['qty']} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
+                                message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}"
                                 message += f", прибуток {format(profit, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                message += f" Ордер був розміщений {pos['date']} і тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
+                                message += f" загальний час утримання позиції: {format_timedelta(timedelta)}."
                                 print(message)
 
                                 # Записуємо в лог-файл
@@ -293,6 +301,30 @@ def check_and_execute_sell(current_price, precision):
             
             except Exception as e:
                 print(f"❌ КРИТИЧНА ПОМИЛКА при продажі: {e}")
+
+def format_timedelta(timedelta):
+    """
+    Форматує timedelta об'єкт в читабельний формат.
+    :param td: timedelta об'єкт
+    :return: Рядок з форматованим часом (наприклад, "2 дні, 3 години, 15 хвилин")
+    """
+    total_seconds = int(timedelta.total_seconds())
+    days = total_seconds // 86400
+    hours = (total_seconds % 86400) // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    
+    parts = []
+    if days > 0:
+        parts.append(f"{days} {'день' if days == 1 else 'дні' if days % 10 in [2, 3, 4] else 'днів'}")
+    if hours > 0:
+        parts.append(f"{hours} {'година' if hours == 1 else 'години' if hours % 10 in [2, 3, 4] else 'годин'}")
+    if minutes > 0:
+        parts.append(f"{minutes} {'хвилина' if minutes == 1 else 'хвилини' if minutes % 10 in [2, 3, 4] else 'хвилин'}")
+    if seconds > 0 or not parts:
+        parts.append(f"{seconds} {'секунда' if seconds == 1 else 'секунди' if seconds % 10 in [2, 3, 4] else 'секунд'}")
+    
+    return ", ".join(parts)
 
 def log_trade(pos, action, exec_price, profit=None):
     """
