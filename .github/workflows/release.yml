@@ -20,7 +20,7 @@ jobs:
         include:
           - os: ubuntu-latest
             osname: linux
-            asset_name: ${{ github.event.repository.name }}.zip
+            asset_name: ${{ github.event.repository.name }}-${{ github.ref }}.zip
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -36,7 +36,7 @@ jobs:
         uses: vimtor/action-zip@v1.2
         with:
           files: .env.example main.py requirements.txt
-          dest: dist/${{ github.event.repository.name }}.zip
+          dest: dist/${{ matrix.asset_name }}
 
       - name: Make release
         uses: svenstaro/upload-release-action@v2
