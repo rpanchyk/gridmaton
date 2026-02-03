@@ -93,7 +93,7 @@ def check_and_execute_buy(last_price, current_price, precision):
     level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
     
     # Перевірка умови перетину рівня та відсутності дублікатів
-    if last_price > level and current_price <= level:
+    if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
         if not any(abs(p['buy_price'] - level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
             try:
                 print(f"🛒 Спроба купівлі на рівні {level}...")
@@ -114,7 +114,7 @@ def check_and_execute_buy(last_price, current_price, precision):
 
                     # Перевірка статусу (до 5 спроб)
                     for _ in range(5):
-                        time.sleep(2)
+                        time.sleep(1) # Затримка перед перевіркою
                         
                         # Перевіряємо через історію ордерів (найбільш надійно)
                         check = session.get_order_history(
@@ -223,7 +223,9 @@ def check_and_execute_sell(current_price, precision):
                     
                     # Перевірка статусу (до 5 спроб)
                     for _ in range(5):
-                        time.sleep(2)
+                        time.sleep(1) # Затримка перед перевіркою
+
+                        # Перевіряємо через історію ордерів
                         check = session.get_order_history(
                             category="spot",
                             symbol=SYMBOL,
@@ -357,7 +359,7 @@ def main():
     # Завантаження поточних позицій
     global active_positions
     load_positions(precision)
-    if len(active_positions) > 0:
+    if active_positions:
         print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
     else:
         print("📢 Активних позицій немає.")
