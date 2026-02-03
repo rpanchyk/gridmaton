@@ -79,7 +79,7 @@ def load_positions(precision):
         if balance_info.get('retCode') != 0:
             raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
         holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-        print(f"Баланс: {holding_qty} {base_coin}")
+        print(f"💲 Баланс: {holding_qty} {base_coin}")
 
         # Отримання історії ордерів
         history = session.get_order_history(
@@ -94,9 +94,6 @@ def load_positions(precision):
         trades = history['result']['list']
         buys = [t for t in trades if t['side'] == 'Buy']
         buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
-        # history_json = json.dumps(buys, indent=4)
-        # with open('history.json', "w", encoding="utf-8") as f:
-        #     f.write(history_json)
 
         # Відновлення позицій з історії ордерів
         restored = []
@@ -106,7 +103,8 @@ def load_positions(precision):
                 if holding_qty >= qty:
                     restored.append({
                         "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
-                        "buy_price": float(b['avgPrice']),
+                        "side": "Buy",
+                        "price": float(b['avgPrice']),
                         "qty": format(qty, f'.{precision}f')
                     })
                     holding_qty -= qty
@@ -134,7 +132,7 @@ def check_and_execute_buy(last_price, current_price, precision):
 
     # Перевірка умови перетину рівня та відсутності дублікатів
     if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
-        if not any(abs(p['buy_price'] - level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
+        if not any(abs(p['price'] - level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
             try:
                 print(f"🛒 Спроба купівлі на рівні {level}...")
 
@@ -183,7 +181,8 @@ def check_and_execute_buy(last_price, current_price, precision):
                                 # Додаємо в список активних позицій
                                 new_pos = {
                                     "date": datetime.fromtimestamp(int(order_data['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
-                                    "buy_price": exec_price,
+                                    "side": "Buy",
+                                    "price": exec_price,
                                     "qty": format(exec_qty, f'.{precision}f')
                                 }
                                 active_positions.append(new_pos)
@@ -223,7 +222,7 @@ def check_and_execute_sell(current_price, precision):
     """
     global active_positions
     for pos in active_positions[:]:
-        if current_price >= pos['buy_price'] + PROFIT_TARGET:
+        if current_price >= pos['price'] + PROFIT_TARGET:
             try:
                 # Отримуємо назву монети з SYMBOL (наприклад, з "BTCUSDT" робимо "BTC")
                 base_coin = SYMBOL.replace("USDT", "")
@@ -291,7 +290,7 @@ def check_and_execute_sell(current_price, precision):
 
                                 # Отримуємо реальну ціну виконання
                                 exec_price = float(order_data.get('avgPrice', current_price))
-                                profit = (exec_price - pos['buy_price']) * float(pos['qty'])
+                                profit = (exec_price - pos['price']) * float(pos['qty'])
 
                                 # Отримуємо час виконання
                                 exec_time = order_data.get('execTime', 0)
@@ -361,7 +360,7 @@ def log_trade(pos, action, exec_price, profit=None):
 
     # Якщо це продаж, додаємо ціну купівлі та профіт
     if action.upper() == "SELL":
-        log_msg += f" | BuyPrice: {pos['buy_price']} | Profit: {profit:.4f}"
+        log_msg += f" | BuyPrice: {pos['price']} | Profit: {profit:.4f}"
 
     # Запис у файл
     with open(TRADE_LOG_FILE, "a", encoding="utf-8") as f:
@@ -414,12 +413,12 @@ def handle_message(message):
 
         # Розрахунок наступних рівнів для виводу
         next_buy_level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
-        if any(abs(p['buy_price'] - next_buy_level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
+        if any(abs(p['price'] - next_buy_level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
             next_buy_level -= ROUND_LEVEL_STEP
         next_buy_level_str = f"{next_buy_level:.2f}"
         next_sell_price_str = "немає"
         if active_positions:
-            next_sell_price = min(p['buy_price'] + PROFIT_TARGET for p in active_positions)
+            next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions)
             next_sell_price_str = f"{next_sell_price:.2f}"
 
         print(f"Минула ціна: {last_price_str}", end="")
