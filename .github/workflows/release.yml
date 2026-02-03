@@ -20,7 +20,7 @@ jobs:
         include:
           - os: ubuntu-latest
             osname: linux
-            asset_name: ${{ github.event.repository.name }}-${GITHUB_REF#refs/tags/}.zip
+            asset_name: ${{ github.event.repository.name }}-${{ github.ref_name }}.zip
 
     runs-on: ${{ matrix.os }}
     steps:
