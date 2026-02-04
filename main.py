@@ -11,27 +11,27 @@ from pybit.unified_trading import HTTP, WebSocket
 load_dotenv()
 
 # Конфігурація
-API_KEY = os.getenv('API_KEY')
-API_SECRET = os.getenv('API_SECRET')
-TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in ('true', '1')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+API_KEY = os.getenv('API_KEY') # API ключ
+API_SECRET = os.getenv('API_SECRET') # API cекрет
+TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in ('true', '1') # Увімкнення повідомлень в Telegram
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') # Токен бота Telegram
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор чату Telegram
+DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
+BASE_COIN = os.getenv('BASE_COIN', 'BTC') # Базова монета для торгівлі
+QUOTE_COIN = os.getenv('QUOTE_COIN', 'USDT') # Котирувальна монета для торгівлі
+ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
+PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
+LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для купівлі
+LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
+
+# Статичні налаштування
+SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
+POSITIONS_FILE = "positions.json"
+TRADE_LOG_FILE = "trade.log"
 
 # Перевірка наявності ключів API
 if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
-
-# Статичні налаштування
-DEMO_MODE = True
-BASE_COIN = "BTC"
-QUOTE_COIN = "USDT"
-SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
-ORDER_SIZE = 10
-PROFIT_TARGET = 1000
-ROUND_LEVEL_STEP = 1000
-ROUND_LEVEL_OFFSET = 500
-POSITIONS_FILE = "positions.json"
-TRADE_LOG_FILE = "trade.log"
 
 # Ініціалізація сесії та активних позицій
 session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
@@ -128,11 +128,11 @@ def check_and_execute_buy(last_price, current_price, precision):
     :param precision: Кількість знаків після коми для округлення кількості
     """
     global active_positions
-    level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
+    level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
 
     # Перевірка умови перетину рівня та відсутності дублікатів
     if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
-        if not any(abs(p['price'] - level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
+        if not any(abs(p['price'] - level) < (LEVEL_STEP / 2) for p in active_positions):
             try:
                 print(f"🛒 Спроба купівлі на рівні {level}...")
 
@@ -411,9 +411,9 @@ def handle_message(message):
         last_price = current_price
 
         # Розрахунок наступних рівнів для виводу
-        next_buy_level = ((last_price - ROUND_LEVEL_OFFSET) // ROUND_LEVEL_STEP) * ROUND_LEVEL_STEP + ROUND_LEVEL_OFFSET
-        if any(abs(p['price'] - next_buy_level) < (ROUND_LEVEL_STEP / 2) for p in active_positions):
-            next_buy_level -= ROUND_LEVEL_STEP
+        next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
+            next_buy_level -= LEVEL_STEP
         next_buy_level_str = f"{next_buy_level:.2f}"
         next_sell_price_str = "немає"
         if active_positions:

@@ -42,30 +42,24 @@ Copy the `.env.example` file to create your `.env` configuration file:
 cp .env.example .env
 ```
 
-### Step 3: Configure main parameters
+### Step 3: Configure parameters
 
-Edit the `.env` file and set API credentials and other settings:
+Edit the `.env` file to set required settings:
 
-```dotenv
-API_KEY=your_api_key
-API_SECRET=your_api_secret
-TELEGRAM_NOTIFICATIONS=False
-TELEGRAM_TOKEN=your_telegram_bot_token
-TELEGRAM_CHAT_ID=your_telegram_chat_id
-```
-
-### Step 4: Configure optional parameters
-
-Edit `main.py` to customize trading parameters:
-
-| Parameter            | Default   | Description                                 |
-| -------------------- | --------- | ------------------------------------------- |
-| `DEMO_MODE`          | `True`    | Set to `False` to trade with real funds     |
-| `SYMBOL`             | `BTCUSDT` | Trading pair (e.g., `ETHUSDT`, `SOLUSDT`)   |
-| `ORDER_SIZE_USDT`    | `10`      | Size of each buy order in USDT              |
-| `PROFIT_TARGET`      | `1000`    | Profit target per position (in price units) |
-| `ROUND_LEVEL_STEP`   | `1000`    | Distance between buy levels                 |
-| `ROUND_LEVEL_OFFSET` | `500`     | Offset adjustment for buy levels            |
+| Parameter                | Default   | Description                                    |
+| ------------------------ | --------- | ---------------------------------------------- |
+| `API_KEY`                | `-`       | Your Bybit API key                             |
+| `API_SECRET`             | `-`       | Your Bybit API secret                          |
+| `TELEGRAM_NOTIFICATIONS` | `False`   | Set to `True` to enable Telegram notifications |
+| `TELEGRAM_TOKEN`         | `-`       | Your Telegram bot token                        |
+| `TELEGRAM_CHAT_ID`       | `-`       | Your Telegram chat ID                          |
+| `DEMO_MODE`              | `True`    | Set to `False` to trade with real funds        |
+| `BASE_COIN`              | `BTC`     | Base coin symbol                               |
+| `QUOTE_COIN`             | `USDT`    | Quote coin symbol                              |
+| `ORDER_SIZE`             | `10`      | Size of each buy order                         |
+| `PROFIT_TARGET`          | `1000`    | Profit target per position                     |
+| `LEVEL_STEP`             | `1000`    | Distance between buy levels                    |
+| `LEVEL_OFFSET`           | `500`     | Offset adjustment for buy levels               |
 
 ## Usage
 
@@ -103,20 +97,20 @@ The bot will display real-time information in the console:
 
 Press `Ctrl+C` in the terminal to stop the bot gracefully. It may takes a few seconds to close active connections.
 
-### View Trade History
-
-Check the `trade.log` file for detailed trading history:
-
-```shell
-cat trade.log
-```
-
 ### View Active Positions
 
 Active trading positions are saved in `positions.json`:
 
 ```shell
 cat positions.json
+```
+
+### View Trade History
+
+Check the `trade.log` file for detailed trading history:
+
+```shell
+cat trade.log
 ```
 
 ## Key Features
