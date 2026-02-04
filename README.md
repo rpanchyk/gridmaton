@@ -46,20 +46,20 @@ cp .env.example .env
 
 Edit the `.env` file to set required settings:
 
-| Parameter                | Default   | Description                                    |
-| ------------------------ | --------- | ---------------------------------------------- |
-| `API_KEY`                | `-`       | Your Bybit API key                             |
-| `API_SECRET`             | `-`       | Your Bybit API secret                          |
-| `TELEGRAM_NOTIFICATIONS` | `False`   | Set to `True` to enable Telegram notifications |
-| `TELEGRAM_TOKEN`         | `-`       | Your Telegram bot token                        |
-| `TELEGRAM_CHAT_ID`       | `-`       | Your Telegram chat ID                          |
-| `DEMO_MODE`              | `True`    | Set to `False` to trade with real funds        |
-| `BASE_COIN`              | `BTC`     | Base coin symbol                               |
-| `QUOTE_COIN`             | `USDT`    | Quote coin symbol                              |
-| `ORDER_SIZE`             | `10`      | Size of each buy order                         |
-| `PROFIT_TARGET`          | `1000`    | Profit target per position                     |
-| `LEVEL_STEP`             | `1000`    | Distance between buy levels                    |
-| `LEVEL_OFFSET`           | `500`     | Offset adjustment for buy levels               |
+| Parameter                | Default   | Description                                          |
+| ------------------------ | --------- | ----------------------------------------------       |
+| `API_KEY`                | `-`       | Your Bybit API key                                   |
+| `API_SECRET`             | `-`       | Your Bybit API secret                                |
+| `TELEGRAM_NOTIFICATIONS` | `False`   | Set to `True` to enable Telegram notifications       |
+| `TELEGRAM_TOKEN`         | `-`       | Your Telegram bot token                              |
+| `TELEGRAM_CHAT_ID`       | `-`       | Your Telegram chat ID                                |
+| `DEMO_MODE`              | `True`    | Set to `False` to trade with real funds              |
+| `BASE_COIN`              | `BTC`     | Base coin symbol                                     |
+| `QUOTE_COIN`             | `USDT`    | Quote coin symbol                                    |
+| `ORDER_SIZE`             | `10`      | Size of each buy order (quote coin amount)           |
+| `PROFIT_TARGET`          | `1000`    | Profit target per position (quote coin amount)       |
+| `LEVEL_STEP`             | `1000`    | Distance between buy levels (quote coin amount)      |
+| `LEVEL_OFFSET`           | `500`     | Offset adjustment for buy levels (quote coin amount) |
 
 ## Usage
 
