@@ -6,24 +6,35 @@ Automated Crypto Trading Bot
 
 ## Introduction
 
-**Gridmaton** is an automated cryptocurrency trading bot designed to execute algorithmic trades on the crypto exchange on Spot market. It monitors price movements of crypto assets (default: BTCUSDT) and automatically places buy orders when prices cross predefined support levels, then sells at target profit levels. The bot implements a grid trading strategy with configurable levels and profit targets, maintaining active positions in a JSON file for persistence and recovery.
+**Gridmaton** is an automated cryptocurrency trading bot designed to execute Grid-based trades on Spot Market.
+It monitors price movements of asset and automatically places buy order when price crosses predefined levels and then sells at target profit levels.
+Since it works on Spot Market, there is no leverage involved, making it a safer option for traders looking to minimize risk.
+All bought assets are held in the exchange account until sold at profit target, so no stop-loss mechanism is implemented and no liquidation risk exists.
 
 ## Prerequisites
 
-- **Python 3.x** - The bot is written in Python
-- **Bybit API Account** - You need a Bybit account with API access enabled
-  - Create API keys in your Bybit account settings
-  - Ensure your API keys have permissions for spot trading
-- **Internet Connection** - Required for WebSocket connection to exchange
-- **pip** - Python package manager (usually included with Python)
+- **Python 3.x** - The bot is written in Python.
+- **Bybit API Account** - You need a Bybit account with API access enabled.
+  - Create API keys in account settings.
+  - Ensure API keys have permissions for spot trading.
 
 ## Supported exchanges
 
-- Bybit (Spot Market)
+- [Bybit](https://www.bybit.com)
+
+Other exchanges may be supported in future releases.
 
 ## Configuration
 
-### Step 1: Create .env File
+### Step 1: Install Dependencies
+
+Install required Python packages:
+
+```shell
+pip install -r requirements.txt
+```
+
+### Step 2: Create .env File
 
 Copy the `.env.example` file to create your `.env` configuration file:
 
@@ -31,15 +42,9 @@ Copy the `.env.example` file to create your `.env` configuration file:
 cp .env.example .env
 ```
 
-Or on Windows (PowerShell):
+### Step 3: Configure main parameters
 
-```powershell
-Copy-Item .env.example .env
-```
-
-### Step 2: Add Your API Credentials
-
-Edit the `.env` file and add your Bybit API credentials and other settings:
+Edit the `.env` file and set API credentials and other settings:
 
 ```dotenv
 API_KEY=your_api_key
@@ -49,22 +54,14 @@ TELEGRAM_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_telegram_chat_id
 ```
 
-### Step 3: Install Dependencies
-
-Install required Python packages:
-
-```bash
-pip install -r requirements.txt
-```
-
-### Step 4: Configure Parameters (Optional)
+### Step 4: Configure optional parameters
 
 Edit `main.py` to customize trading parameters:
 
 | Parameter            | Default   | Description                                 |
 | -------------------- | --------- | ------------------------------------------- |
 | `DEMO_MODE`          | `True`    | Set to `False` to trade with real funds     |
-| `SYMBOL`             | `BTCUSDT` | Trading pair (e.g., `ETHUSDT`, `BNBUSDT`)   |
+| `SYMBOL`             | `BTCUSDT` | Trading pair (e.g., `ETHUSDT`, `SOLUSDT`)   |
 | `ORDER_SIZE_USDT`    | `10`      | Size of each buy order in USDT              |
 | `PROFIT_TARGET`      | `1000`    | Profit target per position (in price units) |
 | `ROUND_LEVEL_STEP`   | `1000`    | Distance between buy levels                 |
@@ -80,19 +77,21 @@ Run the bot with:
 python main.py
 ```
 
-The bot will start and connect to the exchange with the provided API credentials via WebSocket connection. It will then monitor the price of selected coin and execute trades based on the defined strategy.
+The bot will start and connect to the exchange with the provided API credentials via WebSocket connection. 
+It will then monitor the price of asset and execute trades based on the defined strategy.
 
 ### Monitor Bot Activity
 
 The bot will display real-time information in the console:
+
 - Current and previous prices
 - Number of active positions
-- Next buy/sell price level
-- Execution acknowledgements
+- Next buy/sell price levels
+- Trade execution information
 
 ### Bot Output Example
 
-```
+```shell
 🟢 Бот запущений та готовий до торгівлі BTCUSDT.
 🤺 Точність символу BTCUSDT: 6 знаків після коми.
 📢 Активні позиції (1 шт.): [{"buy_price": 83888.1, "qty": "0.000119"}]
@@ -102,7 +101,7 @@ The bot will display real-time information in the console:
 
 ### Stop the Bot
 
-Press `Ctrl+C` in the terminal to stop the bot gracefully.
+Press `Ctrl+C` in the terminal to stop the bot gracefully. It may takes a few seconds to close active connections.
 
 ### View Trade History
 
@@ -142,7 +141,7 @@ cat positions.json
 - **positions.json** - Current active trading positions (auto-managed)
 - **README.md** - This documentation
 - **requirements.txt** - Python package dependencies
-- **trade.log** - Historical record of all executed trades
+- **trade.log** - Historical record of all executed trades (auto-managed)
 
 ## Development
 
@@ -179,7 +178,7 @@ python -m pip install --upgrade pip-system-certs
 4. **Test Thoroughly** - Always test the bot extensively in demo mode before using it with real money. Verify API credentials and trading parameters carefully.
 5. **API Key Security** - Never share your `.env` file or API credentials. Treat them as sensitive information. Use API keys with restricted trading permissions if possible.
 6. **Network Risk** - The bot relies on continuous internet connectivity. Network failures may prevent position closure or trade execution.
-7. **Exchange Risk** - The bot depends on Bybit exchange availability and API reliability. Exchange outages or API changes may affect operation.
+7. **Exchange Risk** - The bot depends on exchange availability and API reliability. Exchange outages or API changes may affect operation.
 8. **Bugs and Issues** - While efforts have been made to ensure accuracy, bugs may exist. Monitor the bot's activity regularly.
 9. **Market Risk** - Volatile market conditions can lead to rapid price movements and unexpected trading outcomes, especially during volatile periods.
 10. **Compliance** - Ensure compliance with local regulations and your country's cryptocurrency trading laws before using this bot.

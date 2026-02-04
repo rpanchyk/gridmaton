@@ -23,8 +23,10 @@ if not API_KEY or not API_SECRET:
 
 # Статичні налаштування
 DEMO_MODE = True
-SYMBOL = "BTCUSDT"
-ORDER_SIZE_USDT = 10
+BASE_COIN = "BTC"
+QUOTE_COIN = "USDT"
+SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
+ORDER_SIZE = 10
 PROFIT_TARGET = 1000
 ROUND_LEVEL_STEP = 1000
 ROUND_LEVEL_OFFSET = 500
@@ -53,12 +55,11 @@ def load_positions(precision):
     :param precision: Кількість знаків після коми для округлення кількості
     """
     # Отримання балансу монети
-    base_coin = SYMBOL.replace("USDT", "")
-    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
+    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
     holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {base_coin}")
+    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {BASE_COIN}")
 
     print("⚓ Відновлення позицій...")
     global active_positions
@@ -141,7 +142,7 @@ def check_and_execute_buy(last_price, current_price, precision):
                     symbol=SYMBOL,
                     side="Buy",
                     orderType="Market",
-                    qty=str(ORDER_SIZE_USDT) # Для Spot Market Buy вказується сума в USDT
+                    qty=str(ORDER_SIZE) # Для Spot Market Buy вказується сума в USDT
                 )
 
                 if order.get('retCode') == 0:
@@ -188,9 +189,9 @@ def check_and_execute_buy(last_price, current_price, precision):
                                 active_positions.sort(key=lambda x: x['date'])  # Сортуємо за датою
                                 save_positions()
 
-                                message = f"📥 Куплено {exec_qty} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
-                                message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {SYMBOL.replace('BTC', '')}"
-                                message += f" включно з комісією {format(commission * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                message = f"📥 Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                                message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {QUOTE_COIN}"
+                                message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
                                 print(message)
 
                                 # Записуємо в лог-файл
@@ -223,14 +224,13 @@ def check_and_execute_sell(current_price, precision):
     for pos in active_positions[:]:
         if current_price >= pos['price'] + PROFIT_TARGET:
             try:
-                # Отримуємо назву монети з SYMBOL (наприклад, з "BTCUSDT" робимо "BTC")
-                base_coin = SYMBOL.replace("USDT", "")
-                balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
+                # Отримуємо баланс монети
+                balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
 
                 if balance_info.get('retCode') == 0:
                     # Шукаємо баланс конкретної монети в результаті
                     coins = balance_info['result']['list'][0]['coin']
-                    print(f"Баланс {base_coin}: {coins}")
+                    print(f"Баланс {BASE_COIN}: {coins}")
 
                     # Округлюємо кількість ВНИЗ до потрібної точності
                     factor = 10 ** precision
@@ -238,18 +238,18 @@ def check_and_execute_sell(current_price, precision):
                     # Отримуємо доступний баланс (availableToWithdraw або free)
                     available_balance = float(coins[0].get('walletBalance', 0))
                     available_balance = math.floor(available_balance * factor) / factor
-                    print(f"Доступний баланс {base_coin}: {available_balance}")
+                    print(f"Доступний баланс {BASE_COIN}: {available_balance}")
 
                     # Потрібна кількість для продажу
                     needed_qty = float(pos['qty'])
                     needed_qty = math.floor(needed_qty * factor) / factor
-                    print(f"Потрібно продати: {needed_qty} {base_coin}")
+                    print(f"Потрібно продати: {needed_qty} {BASE_COIN}")
 
                     # Перевіряємо, чи вистачає балансу
                     if available_balance < needed_qty:
-                        print(f"⚠️ Недостатньо балансу {base_coin}: Треба {needed_qty}, є {available_balance}")
+                        print(f"⚠️ Недостатньо балансу {BASE_COIN}: Треба {needed_qty}, є {available_balance}")
                         # Тут можна або пропустити, або спробувати продати те, що є:
-                        pos['qty'] = available_balance 
+                        pos['qty'] = available_balance
                         # continue
 
                 print(f"💰 Спроба продажу по {current_price}...")
@@ -296,9 +296,9 @@ def check_and_execute_sell(current_price, precision):
                                 exec_time = datetime.fromtimestamp(int(exec_time)/1000) if exec_time else datetime.now()
                                 timedelta = exec_time - datetime.strptime(pos['date'], '%Y-%m-%d %H:%M:%S')
 
-                                message = f"💰 Продано {pos['qty']} {SYMBOL.replace('USDT', '')} по ціні {exec_price} {SYMBOL.replace('BTC', '')}"
-                                message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {SYMBOL.replace('BTC', '')}"
-                                message += f", прибуток {format(profit, '.2f')} {SYMBOL.replace('BTC', '')}."
+                                message = f"💰 Продано {pos['qty']} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                                message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {QUOTE_COIN}"
+                                message += f", прибуток {format(profit, '.2f')} {QUOTE_COIN}."
                                 message += f" Ордер був розміщений {pos['date']} і тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
                                 message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}."
                                 print(message)
