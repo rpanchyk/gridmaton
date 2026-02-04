@@ -34,7 +34,7 @@ LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рів
 
 # Статичні налаштування
 SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
-FIBO_NUMBERS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
+FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 
