@@ -257,10 +257,12 @@ def get_next_buy_level(last_price):
             if count < x:
                 diff = x - count
                 break
-        if diff > 0:
+        if diff > 1:
             last_position = min(active_positions, key=lambda x: x['price'])
             last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-            level = last_position_level - LEVEL_STEP * diff
+            new_level = last_position_level - LEVEL_STEP * diff
+            if new_level < level:
+                level = new_level
 
     return level
 
