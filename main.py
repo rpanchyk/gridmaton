@@ -99,12 +99,15 @@ def load_positions(precision, force_api=False):
         buys = [t for t in trades if t['side'] == 'Buy']
         buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
 
+        # with open("buys.json", "w") as f:
+        #     json.dump(buys, f, indent=4)
+
         # Відновлення позицій з історії ордерів
         restored = []
         if holding_qty > 0:
             for b in buys:
-                qty = float(b['cumExecQty'])
-                if holding_qty >= qty:
+                qty = float(b['cumExecQty']) - float(b['cumFeeDetail'][BASE_COIN]) # Віднімаємо комісію в BTC
+                if holding_qty >= qty - (qty * 0.1): # Додаємо невеликий запас на комісію та можливі розбіжності
                     restored.append({
                         "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                         "side": "Buy",
@@ -112,6 +115,8 @@ def load_positions(precision, force_api=False):
                         "qty": format(qty, f'.{precision}f')
                     })
                     holding_qty -= qty
+                else:
+                    break
 
         # Оновлення активних позицій
         active_positions = restored
@@ -249,7 +254,7 @@ def get_next_buy_level(last_price):
         count = len(active_positions)
         diff = 0
         for x in FIBO_NUMBERS:
-            if count <= x:
+            if count < x:
                 diff = x - count
                 break
         if diff > 0:
