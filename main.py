@@ -59,7 +59,9 @@ def load_positions(precision):
     if balance_info.get('retCode') != 0:
         raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
     holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {BASE_COIN}")
+    usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
+    equity = float(balance_info['result']['list'][0]['totalEquity'])
+    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity, '.2f')} {QUOTE_COIN}")
 
     print("⚓ Відновлення позицій...")
     global active_positions
@@ -436,12 +438,12 @@ def main():
     Головна функція для запуску бота.
     Вона ініціалізує з'єднання, завантажує позиції та підписується на стрім тікерів.
     """
-    print(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}.")
+    print(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}")
 
     # Отримання точності символу
     global precision
     precision = get_symbol_precision(SYMBOL)
-    print(f"🤺 Точність символу {SYMBOL}: {precision} знаків після коми.")
+    print(f"🤺 Точність символу {SYMBOL}: {precision} знаків після коми")
 
     # Завантаження поточних позицій
     global active_positions
