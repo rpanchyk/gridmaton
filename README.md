@@ -47,7 +47,7 @@ cp .env.example .env
 Edit the `.env` file to set required settings:
 
 | Parameter                | Default   | Description                                          |
-| ------------------------ | --------- | ----------------------------------------------       |
+| ------------------------ | --------- | ---------------------------------------------------- |
 | `API_KEY`                | `-`       | Your Bybit API key                                   |
 | `API_SECRET`             | `-`       | Your Bybit API secret                                |
 | `TELEGRAM_NOTIFICATIONS` | `False`   | Set to `True` to enable Telegram notifications       |
@@ -56,6 +56,7 @@ Edit the `.env` file to set required settings:
 | `DEMO_MODE`              | `True`    | Set to `False` to trade with real funds              |
 | `BASE_COIN`              | `BTC`     | Base coin symbol                                     |
 | `QUOTE_COIN`             | `USDT`    | Quote coin symbol                                    |
+| `GRID_TYPE`              | `LINEAR`  | Grid type: `LINEAR` or `FIBO`                        |
 | `ORDER_SIZE`             | `10`      | Size of each buy order (quote coin amount)           |
 | `PROFIT_TARGET`          | `1000`    | Profit target per position (quote coin amount)       |
 | `LEVEL_STEP`             | `1000`    | Distance between buy levels (quote coin amount)      |

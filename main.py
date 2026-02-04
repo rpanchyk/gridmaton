@@ -1,3 +1,4 @@
+import sys
 import time
 from datetime import datetime
 import math
@@ -5,7 +6,13 @@ import json
 import os
 import requests
 from dotenv import load_dotenv
+from enum import Enum
 from pybit.unified_trading import HTTP, WebSocket
+
+# Перелік типів сітки
+class GridType(Enum):
+    LINEAR = 1
+    FIBO = 2
 
 # Завантаження змінних оточення
 load_dotenv()
@@ -19,6 +26,7 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор ч
 DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
 BASE_COIN = os.getenv('BASE_COIN', 'BTC') # Базова монета для торгівлі
 QUOTE_COIN = os.getenv('QUOTE_COIN', 'USDT') # Котирувальна монета для торгівлі
+GRRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
 ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
 PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
 LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для купівлі
@@ -26,6 +34,7 @@ LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рів
 
 # Статичні налаштування
 SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
+FIBO_NUMBERS = [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 
@@ -130,7 +139,7 @@ def check_and_execute_buy(last_price, current_price, precision):
     :param precision: Кількість знаків після коми для округлення кількості
     """
     global active_positions
-    level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+    level = get_next_buy_level(last_price)
 
     # Перевірка умови перетину рівня та відсутності дублікатів
     if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
@@ -215,6 +224,40 @@ def check_and_execute_buy(last_price, current_price, precision):
 
             except Exception as e:
                 print(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
+
+def get_next_buy_level(last_price):
+    """
+    Розрахунок наступного рівня купівлі на основі останньої ціни та типу сітки.
+    :param last_price: Остання ціна
+    :return: Розрахований рівень купівлі
+    """
+    global GRRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS, active_positions
+
+    # Розрахунок рівня на основі кроку та зсуву для поточної ціни
+    level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+
+    # Якщо немає активних позицій, повертаємо розрахований рівень
+    if not active_positions:
+        return level
+
+    # Якщо тип сітки лінійний, повертаємо розрахований рівень
+    if GRRID_TYPE == GridType.LINEAR:
+        return level
+
+    # Коригування рівня відповідно до послідовності Фібоначчі
+    if GRRID_TYPE == GridType.FIBO:
+        count = len(active_positions)
+        diff = 0
+        for x in FIBO_NUMBERS:
+            if count <= x:
+                diff = x - count
+                break
+        if diff > 0:
+            last_position = min(active_positions, key=lambda x: x['price'])
+            last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+            level = last_position_level - LEVEL_STEP * diff
+
+    return level
 
 def check_and_execute_sell(current_price, precision):
     """
@@ -412,11 +455,14 @@ def handle_message(message):
         # Оновлення останньої ціни
         last_price = current_price
 
-        # Розрахунок наступних рівнів для виводу
-        next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
-            next_buy_level -= LEVEL_STEP
+        # Розрахунок наступного рівня купівлі
+        # next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        # if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
+        #     next_buy_level -= LEVEL_STEP
+        next_buy_level = get_next_buy_level(last_price)
         next_buy_level_str = f"{next_buy_level:.2f}"
+        
+        # Розрахунок наступного рівня продажу
         next_sell_price_str = "немає"
         if active_positions:
             next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions)
