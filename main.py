@@ -58,7 +58,7 @@ def get_symbol_precision(symbol):
     res = info['result']['list'][0]['lotSizeFilter']['basePrecision']
     return len(res.split('.')[1]) if '.' in res else 0
 
-def load_positions(precision):
+def load_positions(precision, force_api=False):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     :param precision: Кількість знаків після коми для округлення кількості
@@ -74,7 +74,7 @@ def load_positions(precision):
 
     print("⚓ Відновлення позицій...")
     global active_positions
-    if os.path.exists(POSITIONS_FILE):
+    if os.path.exists(POSITIONS_FILE) and not force_api:
         print("🔍 Відновлюємо позиції з локального файлу...")
         with open(POSITIONS_FILE, "r") as f:
             active_positions = json.load(f)
@@ -328,9 +328,8 @@ def check_and_execute_sell(current_price, precision):
                             status = order_data['orderStatus']
 
                             if status == "Filled":
-                                # Видаляємо позицію зі списку активних та зберігаємо файл
-                                active_positions.remove(pos)
-                                save_positions()
+                                # Оновлюємо позиції з API, щоб уникнути розбіжностей
+                                load_positions(precision, force_api=True)
 
                                 # Отримуємо реальну ціну виконання
                                 exec_price = float(order_data.get('avgPrice', current_price))
