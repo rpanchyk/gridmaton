@@ -107,7 +107,7 @@ def load_positions(precision, force_api=False):
         if holding_qty > 0:
             for b in buys:
                 qty = float(b['cumExecQty']) - float(b['cumFeeDetail'][BASE_COIN]) # Віднімаємо комісію в BTC
-                if holding_qty >= qty - (qty * 0.1): # Додаємо невеликий запас на комісію та можливі розбіжності
+                if holding_qty >= qty:
                     restored.append({
                         "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                         "side": "Buy",
