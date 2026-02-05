@@ -45,7 +45,6 @@ if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
 
 # Ініціалізація глобальних змінних
-session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
 data_queue = queue.Queue() # Черга для обробки даних
 precision = 8 # Точність символу (кількість знаків після коми)
 active_positions = [] # Список активних позицій
@@ -61,8 +60,8 @@ def get_symbol_precision(symbol):
     info = session.get_instruments_info(category="spot", symbol=symbol)
     if len(info['result']['list']) == 0:
         raise ValueError("Невірний символ або відсутня інформація про нього.")
-    res = info['result']['list'][0]['lotSizeFilter']['basePrecision']
-    return len(res.split('.')[1]) if '.' in res else 0
+    value = info['result']['list'][0]['lotSizeFilter']['basePrecision']
+    return len(value.split('.')[1]) if '.' in value else 0
 
 def load_positions(precision, force_api=False):
     """
@@ -151,7 +150,7 @@ def check_and_execute_buy(last_price, current_price, precision):
     :param current_price: Поточна ціна для порівняння з рівнем
     :param precision: Кількість знаків після коми для округлення кількості
     """
-    global active_positions
+    global session, active_positions
     level = get_next_buy_level(last_price)
 
     # Перевірка умови перетину рівня та відсутності дублікатів
@@ -280,7 +279,7 @@ def check_and_execute_sell(current_price, precision):
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     :param precision: Кількість знаків після коми для округлення
     """
-    global active_positions
+    global session, active_positions
     for pos in active_positions[:]:
         if current_price >= pos['price'] + PROFIT_TARGET:
             try:
@@ -535,6 +534,16 @@ def main():
     for _ in range(num_worker_threads):
         threading.Thread(target=worker, daemon=True).start()
 
+    # Ініціалізація сесії API
+    global session
+    try:
+        print("🔗 Підключення до біржі ", end="")
+        session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
+        print("виконано успішно")
+    except Exception as e:
+        print(f"❌ завершено з помилкою: {e}")
+        return
+
     # Отримання точності символу
     global precision
     precision = get_symbol_precision(SYMBOL)
@@ -548,15 +557,10 @@ def main():
     else:
         print("📢 Активних позицій немає")
 
-    # Підписка на стрім тікерів
+    # Ініціалізація веб-сокета для отримання тікерів
     try:
-        print("🔄 Підключення до біржі ", end="")
-        ws = WebSocket(
-            testnet=False,
-            channel_type="spot",
-            api_key=API_KEY,
-            api_secret=API_SECRET
-        )
+        print("🔄 Підписка на стрім тікерів ", end="")
+        ws = WebSocket(testnet=False, channel_type="spot", api_key=API_KEY, api_secret=API_SECRET)
         ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
         print("виконано успішно")
     except Exception as e:
