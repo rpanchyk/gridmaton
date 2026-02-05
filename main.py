@@ -46,6 +46,7 @@ if not API_KEY or not API_SECRET:
 
 # Ініціалізація глобальних змінних
 data_queue = queue.Queue() # Черга для обробки даних
+session = None # Сесія API
 precision = 8 # Точність символу (кількість знаків після коми)
 active_positions = [] # Список активних позицій
 last_price = 0.0 # Остання ціна символу
@@ -178,7 +179,7 @@ def process_data(data):
 
         # Перевірка останньої (попередньої) отриманої ціни
         global last_price
-        if last_price == 0:
+        if last_price <= 0:
             last_price = current_price
             return # Ігноруємо перше повідомлення, яке встановлює базову ціну
 
@@ -187,8 +188,8 @@ def process_data(data):
             return # Ігноруємо, якщо ціна не змінилася
 
         # Перевірка на купівлю/продаж
-        check_and_execute_buy(last_price, current_price, precision)
-        check_and_execute_sell(current_price, precision)
+        check_and_execute_buy(current_price)
+        check_and_execute_sell(current_price)
 
         # Форматування для виводу
         last_price_str = f"{last_price:.2f}"
@@ -221,14 +222,12 @@ def process_data(data):
     except Exception as e:
         print(f"❌ Помилка в обробці WebSocket повідомлення: {e}")
 
-def check_and_execute_buy(last_price, current_price, precision):
+def check_and_execute_buy(current_price):
     """
     Перевіряє ціну та виконує купівлю, якщо ціна перетинає рівень і немає активних позицій на цьому рівні.
-    :param last_price: Остання ціна для визначення рівня
-    :param current_price: Поточна ціна для порівняння з рівнем
-    :param precision: Кількість знаків після коми для округлення кількості
+    :param current_price: Поточна ціна для порівняння з рівнем купівлі
     """
-    global session, active_positions
+    global session, precision, active_positions, last_price
     level = get_next_buy_level(last_price)
 
     # Перевірка умови перетину рівня та відсутності дублікатів
@@ -351,13 +350,12 @@ def get_next_buy_level(last_price):
 
     return level
 
-def check_and_execute_sell(current_price, precision):
+def check_and_execute_sell(current_price):
     """
     Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
     :param current_price: Поточна ціна для порівняння з рівнями продажу
-    :param precision: Кількість знаків після коми для округлення
     """
-    global session, active_positions
+    global session, precision, active_positions
     for pos in active_positions[:]:
         if current_price >= pos['price'] + PROFIT_TARGET:
             try:
@@ -365,15 +363,11 @@ def check_and_execute_sell(current_price, precision):
                 balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
 
                 if balance_info.get('retCode') == 0:
-                    # Шукаємо баланс конкретної монети в результаті
-                    coins = balance_info['result']['list'][0]['coin']
-                    print(f"Баланс {BASE_COIN}: {coins}")
-
                     # Округлюємо кількість ВНИЗ до потрібної точності
                     factor = 10 ** precision
 
                     # Отримуємо доступний баланс (availableToWithdraw або free)
-                    available_balance = float(coins[0].get('walletBalance', 0))
+                    available_balance = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
                     available_balance = math.floor(available_balance * factor) / factor
                     print(f"Доступний баланс {BASE_COIN}: {available_balance}")
 
@@ -386,8 +380,8 @@ def check_and_execute_sell(current_price, precision):
                     if available_balance < needed_qty:
                         print(f"⚠️ Недостатньо балансу {BASE_COIN}: Треба {needed_qty}, є {available_balance}")
                         # Тут можна або пропустити, або спробувати продати те, що є:
-                        pos['qty'] = available_balance
                         # continue
+                        pos['qty'] = available_balance
 
                 print(f"💰 Спроба продажу по {current_price}...")
                 order = session.place_order(
