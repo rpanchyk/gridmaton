@@ -143,6 +143,84 @@ def save_positions():
     with open(POSITIONS_FILE, "w") as f:
         json.dump(active_positions, f, indent=4)
 
+def handle_message(message):
+    """
+    Обробка повідомлень з WebSocket стріму тікерів.
+    :param message: Повідомлення
+    """
+    global data_queue
+    if 'data' in message:
+        data_queue.put(message['data'])
+
+def worker():
+    """
+    Обробка повідомлень з черги.
+    """
+    global data_queue
+    while True:
+        data = data_queue.get()
+        if data is None:
+            break
+
+        process_data(data)
+
+        data_queue.task_done()
+
+def process_data(data):
+    """
+    Обробка отриманих даних.
+    :param data: Дані повідомлення
+    """
+    global precision, active_positions, last_price
+    try:
+        # Отримуємо поточну ціну
+        current_price = float(data['lastPrice'])
+
+        # Перевірка останньої (попередньої) отриманої ціни
+        global last_price
+        if last_price == 0:
+            last_price = current_price
+            return # Ігноруємо перше повідомлення, яке встановлює базову ціну
+
+        # Перевірка на зміну ціни
+        if current_price == last_price:
+            return # Ігноруємо, якщо ціна не змінилася
+
+        # Перевірка на купівлю/продаж
+        check_and_execute_buy(last_price, current_price, precision)
+        check_and_execute_sell(current_price, precision)
+
+        # Форматування для виводу
+        last_price_str = f"{last_price:.2f}"
+        current_price_str = f"{current_price:.2f}"
+
+        # Оновлення останньої ціни
+        last_price = current_price
+
+        # Розрахунок наступного рівня купівлі
+        # next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        # if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
+        #     next_buy_level -= LEVEL_STEP
+        next_buy_level = get_next_buy_level(last_price)
+        next_buy_level_str = f"{next_buy_level:.2f}"
+
+        # Розрахунок наступного рівня продажу
+        next_sell_price_str = "немає"
+        if active_positions:
+            next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions)
+            next_sell_price_str = f"{next_sell_price:.2f}"
+
+        print(f"Минула ціна: {last_price_str}", end="")
+        print(f" | Поточна ціна: {current_price_str}", end="")
+        print(f" | Позицій: {len(active_positions)}", end="")
+        print(f" | Наст.купівля: {next_buy_level_str}", end="")
+        print(f" | Наст.продаж: {next_sell_price_str}", end="")
+        print("", flush=True)
+    except KeyError:
+        pass # Ігноруємо неочікувані повідомлення
+    except Exception as e:
+        print(f"❌ Помилка в обробці WebSocket повідомлення: {e}")
+
 def check_and_execute_buy(last_price, current_price, precision):
     """
     Перевіряє ціну та виконує купівлю, якщо ціна перетинає рівень і немає активних позицій на цьому рівні.
@@ -443,84 +521,6 @@ def send_telegram(message):
         requests.post(url, data=data)
     except Exception as e:
         print(f"Помилка Telegram: {e}")
-
-def handle_message(message):
-    """
-    Обробка повідомлень з WebSocket стріму тікерів.
-    :param message: Повідомлення
-    """
-    global data_queue
-    if 'data' in message:
-        data_queue.put(message['data'])
-
-def worker():
-    """
-    Обробка повідомлень з черги.
-    """
-    global data_queue
-    while True:
-        data = data_queue.get()
-        if data is None:
-            break
-
-        process_data(data)
-
-        data_queue.task_done()
-
-def process_data(data):
-    """
-    Обробка отриманих даних.
-    :param data: Дані повідомлення
-    """
-    global precision, active_positions, last_price
-    try:
-        # Отримуємо поточну ціну
-        current_price = float(data['lastPrice'])
-
-        # Перевірка останньої (попередньої) отриманої ціни
-        global last_price
-        if last_price == 0:
-            last_price = current_price
-            return # Ігноруємо перше повідомлення, яке встановлює базову ціну
-
-        # Перевірка на зміну ціни
-        if current_price == last_price:
-            return # Ігноруємо, якщо ціна не змінилася
-
-        # Перевірка на купівлю/продаж
-        check_and_execute_buy(last_price, current_price, precision)
-        check_and_execute_sell(current_price, precision)
-
-        # Форматування для виводу
-        last_price_str = f"{last_price:.2f}"
-        current_price_str = f"{current_price:.2f}"
-
-        # Оновлення останньої ціни
-        last_price = current_price
-
-        # Розрахунок наступного рівня купівлі
-        # next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        # if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
-        #     next_buy_level -= LEVEL_STEP
-        next_buy_level = get_next_buy_level(last_price)
-        next_buy_level_str = f"{next_buy_level:.2f}"
-        
-        # Розрахунок наступного рівня продажу
-        next_sell_price_str = "немає"
-        if active_positions:
-            next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions)
-            next_sell_price_str = f"{next_sell_price:.2f}"
-
-        print(f"Минула ціна: {last_price_str}", end="")
-        print(f" | Поточна ціна: {current_price_str}", end="")
-        print(f" | Позицій: {len(active_positions)}", end="")
-        print(f" | Наст.купівля: {next_buy_level_str}", end="")
-        print(f" | Наст.продаж: {next_sell_price_str}", end="")
-        print("", flush=True)
-    except KeyError:
-        pass # Ігноруємо неочікувані повідомлення
-    except Exception as e:
-        print(f"❌ Помилка в обробці WebSocket повідомлення: {e}")
 
 def main():
     """
