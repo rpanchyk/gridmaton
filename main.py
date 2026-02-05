@@ -382,17 +382,6 @@ def get_next_lower_buy_level():
 
     # Коригування рівня відповідно до послідовності Фібоначчі
     if GRID_TYPE == GridType.FIBO:
-        # sequential_levels = []
-        # prev_level = None
-        # for p in reversed(active_positions):
-        #     p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        #     if not prev_level or p_level == prev_level + LEVEL_STEP:
-        #         sequential_levels.append(p_level)
-        #     else:
-        #         break
-        #     prev_level = p_level
-        # count = len(sequential_levels)
-
         count = len(active_positions)
         prev_fibo = 0
         for curr_fibo in FIBO_NUMBERS:
@@ -439,9 +428,6 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     else:
         return # Рівень купівлі не перетнуто
 
-    # Перевірка умови перетину рівня та відсутності дублікатів
-    # if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
-    #     if not any(abs(p['price'] - level) < (LEVEL_STEP / 2) for p in active_positions):
     try:
         print(f"🛒 Спроба купівлі на рівні {level}...")
 
