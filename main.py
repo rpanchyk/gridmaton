@@ -388,7 +388,9 @@ def get_next_lower_buy_level():
             if count < curr_fibo:
                 diff = curr_fibo - prev_fibo
                 if diff > 1:
-                    level -= LEVEL_STEP * (diff - 1) # Зсув рівня вниз
+                    last_position = min(active_positions, key=lambda x: x['price'])
+                    last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+                    level = last_position_level - LEVEL_STEP * diff # Зсув рівня вниз
                 break
             prev_fibo = curr_fibo
 
