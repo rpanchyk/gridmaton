@@ -359,6 +359,42 @@ def format_timedelta(timedelta):
 
     return ", ".join(parts)
 
+def get_next_buy_level(last_price):
+    """
+    Розрахунок наступного рівня купівлі на основі останньої ціни та типу сітки.
+    :param last_price: Остання ціна
+    :return: Розрахований рівень купівлі
+    """
+    global GRRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS, active_positions
+
+    # Розрахунок рівня на основі кроку та зсуву для поточної ціни
+    level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+
+    # Якщо немає активних позицій, повертаємо розрахований рівень
+    if not active_positions:
+        return level
+
+    # Якщо тип сітки лінійний, повертаємо розрахований рівень
+    if GRRID_TYPE == GridType.LINEAR:
+        return level
+
+    # Коригування рівня відповідно до послідовності Фібоначчі
+    if GRRID_TYPE == GridType.FIBO:
+        count = len(active_positions)
+        diff = 0
+        for x in FIBO_NUMBERS:
+            if count < x:
+                diff = x - count
+                break
+        if diff > 1:
+            last_position = min(active_positions, key=lambda x: x['price'])
+            last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+            new_level = last_position_level - LEVEL_STEP * diff
+            if new_level < level:
+                level = new_level
+
+    return level
+
 def check_and_execute_buy(current_price):
     """
     Перевіряє ціну та виконує купівлю, якщо ціна перетинає рівень і немає активних позицій на цьому рівні.
@@ -449,42 +485,6 @@ def check_and_execute_buy(current_price):
 
             except Exception as e:
                 print(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
-
-def get_next_buy_level(last_price):
-    """
-    Розрахунок наступного рівня купівлі на основі останньої ціни та типу сітки.
-    :param last_price: Остання ціна
-    :return: Розрахований рівень купівлі
-    """
-    global GRRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS, active_positions
-
-    # Розрахунок рівня на основі кроку та зсуву для поточної ціни
-    level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-
-    # Якщо немає активних позицій, повертаємо розрахований рівень
-    if not active_positions:
-        return level
-
-    # Якщо тип сітки лінійний, повертаємо розрахований рівень
-    if GRRID_TYPE == GridType.LINEAR:
-        return level
-
-    # Коригування рівня відповідно до послідовності Фібоначчі
-    if GRRID_TYPE == GridType.FIBO:
-        count = len(active_positions)
-        diff = 0
-        for x in FIBO_NUMBERS:
-            if count < x:
-                diff = x - count
-                break
-        if diff > 1:
-            last_position = min(active_positions, key=lambda x: x['price'])
-            last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-            new_level = last_position_level - LEVEL_STEP * diff
-            if new_level < level:
-                level = new_level
-
-    return level
 
 def log_trade(pos, action, exec_price, profit=None):
     """
