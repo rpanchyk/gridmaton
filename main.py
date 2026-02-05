@@ -28,7 +28,7 @@ TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор ч
 DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
 BASE_COIN = os.getenv('BASE_COIN', 'BTC') # Базова монета для торгівлі
 QUOTE_COIN = os.getenv('QUOTE_COIN', 'USDT') # Котирувальна монета для торгівлі
-GRRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
+GRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
 ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
 PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
 LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для купівлі
@@ -193,31 +193,26 @@ def process_data(data):
         if current_price == last_price:
             return # Ігноруємо, якщо ціна не змінилася
 
-        # Розрахунок наступного рівня купівлі
-        # next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        # if any(abs(p['price'] - next_buy_level) < (LEVEL_STEP / 2) for p in active_positions):
-        #     next_buy_level -= LEVEL_STEP
-        next_buy_level = get_next_buy_level(last_price)
-
-        # Перевірка на виконання продажу або купівлі відповідно до поточної ціни
+        # Перевірка на виконання продажу відповідно до поточної ціни
         check_and_execute_sell(current_price)
-        check_and_execute_buy(current_price)
 
-        # Форматування для виводу
-        last_price_str = f"{last_price:.2f}"
-        current_price_str = f"{current_price:.2f}"
-        next_buy_level_str = f"{next_buy_level:.2f}"
+        # Розрахунок наступних рівнів купівлі
+        next_lower_buy_level = get_next_lower_buy_level()
+        next_upper_buy_level = get_next_upper_buy_level()
+
+        # Перевірка на виконання купівлі відповідно до поточної ціни
+        check_and_execute_buy(current_price, next_lower_buy_level, next_upper_buy_level)
 
         # Розрахунок наступного рівня продажу
         next_sell_price = min([p['price'] + PROFIT_TARGET for p in active_positions]) if active_positions else None
-        next_sell_price_str = f"{next_sell_price:.2f}" if next_sell_price else "немає"
 
         # Виведення інформації
-        print(f"Минула ціна: {last_price_str}", end="")
-        print(f" | Поточна ціна: {current_price_str}", end="")
+        print(f"Минула ціна: {f"{last_price:.2f}"}", end="")
+        print(f" | Поточна ціна: {f"{current_price:.2f}"}", end="")
         print(f" | Позицій: {len(active_positions)}", end="")
-        print(f" | Наст.купівля: {next_buy_level_str}", end="")
-        print(f" | Наст.продаж: {next_sell_price_str}", end="")
+        print(f" | Наст.купівля знизу: {f"{next_lower_buy_level:.2f}"}", end="")
+        print(f" | Наст.купівля зверху: {f"{next_upper_buy_level:.2f}"}", end="")
+        print(f" | Наст.продаж: {f"{next_sell_price:.2f}" if next_sell_price else "немає"}", end="")
         print("", flush=True)
 
         # Оновлення останньої ціни
@@ -359,13 +354,13 @@ def format_timedelta(timedelta):
 
     return ", ".join(parts)
 
-def get_next_buy_level(last_price):
+def get_next_lower_buy_level():
     """
-    Розрахунок наступного рівня купівлі на основі останньої ціни та типу сітки.
-    :param last_price: Остання ціна
+    Розрахунок наступного нижнього рівня купівлі.
     :return: Розрахований рівень купівлі
     """
-    global GRRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS, active_positions
+    global GRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS
+    global active_positions, last_price
 
     # Розрахунок рівня на основі кроку та зсуву для поточної ціни
     level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
@@ -374,117 +369,158 @@ def get_next_buy_level(last_price):
     if not active_positions:
         return level
 
+    # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
+    for p in active_positions:
+        p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        if level == p_level:
+            level -= LEVEL_STEP # Зсув рівня вниз
+            break
+
     # Якщо тип сітки лінійний, повертаємо розрахований рівень
-    if GRRID_TYPE == GridType.LINEAR:
+    if GRID_TYPE == GridType.LINEAR:
         return level
 
     # Коригування рівня відповідно до послідовності Фібоначчі
-    if GRRID_TYPE == GridType.FIBO:
+    if GRID_TYPE == GridType.FIBO:
+        # sequential_levels = []
+        # prev_level = None
+        # for p in reversed(active_positions):
+        #     p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        #     if not prev_level or p_level == prev_level + LEVEL_STEP:
+        #         sequential_levels.append(p_level)
+        #     else:
+        #         break
+        #     prev_level = p_level
+        # count = len(sequential_levels)
+
         count = len(active_positions)
-        diff = 0
-        for x in FIBO_NUMBERS:
-            if count < x:
-                diff = x - count
+        prev_fibo = 0
+        for curr_fibo in FIBO_NUMBERS:
+            if count < curr_fibo:
+                diff = curr_fibo - prev_fibo
+                if diff > 1:
+                    level -= LEVEL_STEP * (diff - 1) # Зсув рівня вниз
                 break
-        if diff > 1:
-            last_position = min(active_positions, key=lambda x: x['price'])
-            last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-            new_level = last_position_level - LEVEL_STEP * diff
-            if new_level < level:
-                level = new_level
+            prev_fibo = curr_fibo
 
     return level
 
-def check_and_execute_buy(current_price):
+def get_next_upper_buy_level():
+    """
+    Розрахунок наступного верхнього рівня купівлі.
+    :return: Розрахований рівень купівлі
+    """
+    global GRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS
+    global active_positions, last_price
+
+    max_price = max([p['price'] for p in active_positions]) if active_positions else None
+    price = max_price if max_price else last_price
+    level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET + LEVEL_STEP
+
+    return level
+
+def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     """
     Перевіряє ціну та виконує купівлю, якщо ціна перетинає рівень і немає активних позицій на цьому рівні.
     :param current_price: Поточна ціна для порівняння з рівнем купівлі
+    :param lower_buy_level: Нижній рівень купівлі
+    :param upper_buy_level: Верхній рівень купівлі
     """
     global session, precision, active_positions, last_price
-    level = get_next_buy_level(last_price)
+
+    # Визначення рівня купівлі, який було перетнуто
+    level = None
+    if last_price > lower_buy_level and current_price <= lower_buy_level:
+        print(f"🧃 Перетин нижнього рівня купівлі {lower_buy_level} вниз")
+        level = lower_buy_level
+    elif last_price < upper_buy_level and current_price >= upper_buy_level:
+        print(f"🧃 Перетин верхнього рівня купівлі {upper_buy_level} вверх")
+        level = upper_buy_level
+    else:
+        return # Рівень купівлі не перетнуто
 
     # Перевірка умови перетину рівня та відсутності дублікатів
-    if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
-        if not any(abs(p['price'] - level) < (LEVEL_STEP / 2) for p in active_positions):
-            try:
-                print(f"🛒 Спроба купівлі на рівні {level}...")
+    # if (last_price > level and current_price <= level) or (last_price < level and current_price >= level):
+    #     if not any(abs(p['price'] - level) < (LEVEL_STEP / 2) for p in active_positions):
+    try:
+        print(f"🛒 Спроба купівлі на рівні {level}...")
 
-                # Розміщуємо ринковий ордер
-                order = session.place_order(
+        # Розміщуємо ринковий ордер
+        order = session.place_order(
+            category="spot",
+            symbol=SYMBOL,
+            side="Buy",
+            orderType="Market",
+            qty=str(ORDER_SIZE) # Для Spot Market Buy вказується сума в USDT
+        )
+
+        if order.get('retCode') == 0:
+            order_id = order['result']['orderId']
+            print(f"🚚 Ордер {order_id} розміщено. Очікування виконання...")
+            is_filled = False
+
+            # Перевірка статусу (до 5 спроб)
+            for _ in range(5):
+                time.sleep(1) # Затримка перед перевіркою
+
+                # Перевіряємо через історію ордерів
+                check = session.get_order_history(
                     category="spot",
                     symbol=SYMBOL,
-                    side="Buy",
-                    orderType="Market",
-                    qty=str(ORDER_SIZE) # Для Spot Market Buy вказується сума в USDT
+                    orderId=order_id
                 )
+                # print(f"Історія ордеру: {check}")
 
-                if order.get('retCode') == 0:
-                    order_id = order['result']['orderId']
-                    print(f"🚚 Ордер {order_id} розміщено. Очікування виконання...")
-                    is_filled = False
+                if check.get('retCode') == 0 and check['result']['list']:
+                    order_data = check['result']['list'][0]
+                    status = order_data['orderStatus']
 
-                    # Перевірка статусу (до 5 спроб)
-                    for _ in range(5):
-                        time.sleep(1) # Затримка перед перевіркою
+                    if status == "Filled":
+                        # Отримуємо реальні дані виконання
+                        exec_qty = float(order_data.get('cumExecQty', 0))
+                        exec_price = float(order_data.get('avgPrice', current_price))
+                        commission = float(order_data.get('cumExecFee', 0))
 
-                        # Перевіряємо через історію ордерів
-                        check = session.get_order_history(
-                            category="spot",
-                            symbol=SYMBOL,
-                            orderId=order_id
-                        )
-                        # print(f"Історія ордеру: {check}")
+                        exec_qty = exec_qty - commission  # Віднімаємо комісію в BTC
 
-                        if check.get('retCode') == 0 and check['result']['list']:
-                            order_data = check['result']['list'][0]
-                            status = order_data['orderStatus']
+                        # Округлюємо кількість ВНИЗ до потрібної точності
+                        factor = 10 ** precision
+                        exec_qty = math.floor(exec_qty * factor) / factor
 
-                            if status == "Filled":
-                                # Отримуємо реальні дані виконання
-                                exec_qty = float(order_data.get('cumExecQty', 0))
-                                exec_price = float(order_data.get('avgPrice', current_price))
-                                commission = float(order_data.get('cumExecFee', 0))
+                        # Додаємо в список активних позицій
+                        new_pos = {
+                            "date": datetime.fromtimestamp(int(order_data['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
+                            "side": "Buy",
+                            "price": exec_price,
+                            "qty": format(exec_qty, f'.{precision}f')
+                        }
+                        active_positions.append(new_pos)
+                        save_positions()
 
-                                exec_qty = exec_qty - commission  # Віднімаємо комісію в BTC
+                        message = f"📥 Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                        message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {QUOTE_COIN}"
+                        message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
+                        print(message)
 
-                                # Округлюємо кількість ВНИЗ до потрібної точності
-                                factor = 10 ** precision
-                                exec_qty = math.floor(exec_qty * factor) / factor
+                        # Записуємо в лог-файл
+                        log_trade(new_pos, "BUY", exec_price)
 
-                                # Додаємо в список активних позицій
-                                new_pos = {
-                                    "date": datetime.fromtimestamp(int(order_data['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
-                                    "side": "Buy",
-                                    "price": exec_price,
-                                    "qty": format(exec_qty, f'.{precision}f')
-                                }
-                                active_positions.append(new_pos)
-                                save_positions()
+                        # Оповіщаємо в Telegram
+                        send_telegram(message)
 
-                                message = f"📥 Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
-                                message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {QUOTE_COIN}"
-                                message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
-                                print(message)
+                        is_filled = True
+                        break
+                    elif status in ["Cancelled", "Rejected"]:
+                        print(f"⚠️ Ордер скасовано або відхилено: {status}")
+                        break
 
-                                # Записуємо в лог-файл
-                                log_trade(new_pos, "BUY", exec_price)
+            if not is_filled:
+                print(f"⏳ Статус ордера {order_id} не визначено. Позицію не додано.")
+        else:
+            print(f"❌ Помилка API: {order.get('retMsg')}")
 
-                                # Оповіщаємо в Telegram
-                                send_telegram(message)
-
-                                is_filled = True
-                                break
-                            elif status in ["Cancelled", "Rejected"]:
-                                print(f"⚠️ Ордер скасовано або відхилено: {status}")
-                                break
-
-                    if not is_filled:
-                        print(f"⏳ Статус ордера {order_id} не визначено. Позицію не додано.")
-                else:
-                    print(f"❌ Помилка API: {order.get('retMsg')}")
-
-            except Exception as e:
-                print(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
+    except Exception as e:
+        print(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
 
 def log_trade(pos, action, exec_price, profit=None):
     """
