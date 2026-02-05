@@ -75,10 +75,10 @@ def load_positions(precision, force_api=False):
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
-    holding_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+    balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
     usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
-    equity = float(balance_info['result']['list'][0]['totalEquity'])
-    print(f"💲 Баланс: {format(holding_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity, '.2f')} {QUOTE_COIN}")
+    equity_qty = float(balance_info['result']['list'][0]['totalEquity'])
+    print(f"💲 Баланс: {format(balance_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity_qty, '.2f')} {QUOTE_COIN}")
 
     print("⚓ Відновлення позицій...")
     global active_positions
@@ -106,23 +106,24 @@ def load_positions(precision, force_api=False):
         trades = history['result']['list']
         buys = [t for t in trades if t['side'] == 'Buy']
         buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
-
         # with open("buys.json", "w") as f:
         #     json.dump(buys, f, indent=4)
 
         # Відновлення позицій з історії ордерів
         restored = []
-        if holding_qty > 0:
+        if balance_qty > 0:
             for b in buys:
-                qty = float(b['cumExecQty']) - float(b['cumFeeDetail'][BASE_COIN]) # Віднімаємо комісію в BTC
-                if holding_qty >= qty:
+                fee = float(b['cumFeeDetail'][BASE_COIN]) if BASE_COIN in b['cumFeeDetail'] else 0
+                qty = float(b['cumExecQty']) - fee # Віднімаємо комісію в BTC
+                if balance_qty >= qty:
                     restored.append({
                         "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                         "side": "Buy",
                         "price": float(b['avgPrice']),
-                        "qty": format(qty, f'.{precision}f')
+                        "qty": format(qty, f'.{precision+2}f'),
+                        "fee": format(fee, f'.{precision+2}f')
                     })
-                    holding_qty -= qty
+                    balance_qty -= qty
                 else:
                     break
 
@@ -464,34 +465,22 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                     status = order_data['orderStatus']
 
                     if status == "Filled":
+                        # Оновлюємо позиції з API, щоб уникнути розбіжностей
+                        load_positions(precision, force_api=True)
+
                         # Отримуємо реальні дані виконання
-                        exec_qty = float(order_data.get('cumExecQty', 0))
-                        exec_price = float(order_data.get('avgPrice', current_price))
-                        commission = float(order_data.get('cumExecFee', 0))
-
-                        exec_qty = exec_qty - commission  # Віднімаємо комісію в BTC
-
-                        # Округлюємо кількість ВНИЗ до потрібної точності
-                        factor = 10 ** precision
-                        exec_qty = math.floor(exec_qty * factor) / factor
-
-                        # Додаємо в список активних позицій
-                        new_pos = {
-                            "date": datetime.fromtimestamp(int(order_data['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
-                            "side": "Buy",
-                            "price": exec_price,
-                            "qty": format(exec_qty, f'.{precision}f')
-                        }
-                        active_positions.append(new_pos)
-                        save_positions()
+                        pos = active_positions[-1]
+                        exec_price = pos['price']
+                        exec_qty = float(pos['qty'])
+                        commission = float(pos['fee'])
 
                         message = f"📥 Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
-                        message += f", що становить {format(float(order_data.get('qty', 0)), '.2f')} {QUOTE_COIN}"
+                        message += f", що становить {format(exec_qty * exec_price, '.2f')} {QUOTE_COIN}"
                         message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
                         print(message)
 
                         # Записуємо в лог-файл
-                        log_trade(new_pos, "BUY", exec_price)
+                        log_trade(pos, "BUY", exec_price)
 
                         # Оповіщаємо в Telegram
                         send_telegram(message)
