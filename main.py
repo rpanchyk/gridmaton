@@ -4,7 +4,9 @@ from datetime import datetime
 import math
 import json
 import os
+import queue
 import requests
+import threading
 from dotenv import load_dotenv
 from enum import Enum
 from pybit.unified_trading import HTTP, WebSocket
@@ -42,9 +44,12 @@ TRADE_LOG_FILE = "trade.log"
 if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
 
-# Ініціалізація сесії та активних позицій
+# Ініціалізація глобальних змінних
 session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
-active_positions = []
+active_positions = [] # Список активних позицій
+data_queue = queue.Queue() # Черга для обробки даних
+precision = 8 # Точність символу (кількість знаків після коми)
+last_price = 0.0 # Остання ціна символу
 
 def get_symbol_precision(symbol):
     """
@@ -52,6 +57,7 @@ def get_symbol_precision(symbol):
     :param symbol: Символ
     :return: Точність символу
     """
+    global session
     info = session.get_instruments_info(category="spot", symbol=symbol)
     if len(info['result']['list']) == 0:
         raise ValueError("Невірний символ або відсутня інформація про нього.")
@@ -63,6 +69,8 @@ def load_positions(precision, force_api=False):
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     :param precision: Кількість знаків після коми для округлення кількості
     """
+    global session, active_positions
+
     # Отримання балансу монети
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
     if balance_info.get('retCode') != 0:
@@ -440,12 +448,34 @@ def send_telegram(message):
 def handle_message(message):
     """
     Обробка повідомлень з WebSocket стріму тікерів.
-    :param message: Дані повідомлення
+    :param message: Повідомлення
+    """
+    global data_queue
+    if 'data' in message:
+        data_queue.put(message['data'])
+
+def worker():
+    """
+    Обробка повідомлень з черги.
+    """
+    global data_queue
+    while True:
+        data = data_queue.get()
+        if data is None:
+            break
+
+        process_data(data)
+
+        data_queue.task_done()
+
+def process_data(data):
+    """
+    Обробка отриманих даних.
+    :param data: Дані повідомлення
     """
     global precision, active_positions, last_price
     try:
         # Обробка повідомлення тікера
-        data = message['data']
         current_price = float(data['lastPrice'])
         if current_price == last_price:
             return # Ігноруємо, якщо ціна не змінилася
@@ -509,6 +539,11 @@ def main():
     global last_price
     last_price = float(session.get_tickers(category="spot", symbol=SYMBOL)['result']['list'][0]['lastPrice'])
 
+    # Запуск робочих потоків для обробки повідомлень
+    num_worker_threads = 2
+    for _ in range(num_worker_threads):
+        threading.Thread(target=worker, daemon=True).start()
+
     # Підписка на стрім тікерів
     try:
         print("🔄 Підключення до біржі ", end="")
@@ -527,7 +562,7 @@ def main():
     # Утримання програми в активному стані
     try:
         while True:
-            time.sleep(10)
+            time.sleep(1)
     except KeyboardInterrupt:
         print("🔴 Бот зупинено.")
 
