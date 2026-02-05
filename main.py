@@ -186,17 +186,10 @@ def process_data(data):
         # Перевірка на зміну ціни
         if current_price == last_price:
             return # Ігноруємо, якщо ціна не змінилася
-
-        # Перевірка на купівлю/продаж
-        check_and_execute_buy(current_price)
-        check_and_execute_sell(current_price)
-
-        # Форматування для виводу
-        last_price_str = f"{last_price:.2f}"
-        current_price_str = f"{current_price:.2f}"
-
-        # Оновлення останньої ціни
-        last_price = current_price
+        
+        # Розрахунок наступного рівня продажу
+        next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions) if active_positions else None
+        next_sell_price_str = f"{next_sell_price:.2f}" if next_sell_price else "немає"
 
         # Розрахунок наступного рівня купівлі
         # next_buy_level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
@@ -205,18 +198,24 @@ def process_data(data):
         next_buy_level = get_next_buy_level(last_price)
         next_buy_level_str = f"{next_buy_level:.2f}"
 
-        # Розрахунок наступного рівня продажу
-        next_sell_price_str = "немає"
-        if active_positions:
-            next_sell_price = min(p['price'] + PROFIT_TARGET for p in active_positions)
-            next_sell_price_str = f"{next_sell_price:.2f}"
+        # Перевірка на виконання продажу або купівлі відповідно до поточної ціни
+        check_and_execute_sell(current_price)
+        check_and_execute_buy(current_price)
 
+        # Форматування для виводу
+        last_price_str = f"{last_price:.2f}"
+        current_price_str = f"{current_price:.2f}"
+
+        # Виведення інформації
         print(f"Минула ціна: {last_price_str}", end="")
         print(f" | Поточна ціна: {current_price_str}", end="")
         print(f" | Позицій: {len(active_positions)}", end="")
         print(f" | Наст.купівля: {next_buy_level_str}", end="")
         print(f" | Наст.продаж: {next_sell_price_str}", end="")
         print("", flush=True)
+
+        # Оновлення останньої ціни
+        last_price = current_price
     except KeyError:
         pass # Ігноруємо неочікувані повідомлення
     except Exception as e:
