@@ -46,9 +46,9 @@ if not API_KEY or not API_SECRET:
 
 # Ініціалізація глобальних змінних
 session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
-active_positions = [] # Список активних позицій
 data_queue = queue.Queue() # Черга для обробки даних
 precision = 8 # Точність символу (кількість знаків після коми)
+active_positions = [] # Список активних позицій
 last_price = 0.0 # Остання ціна символу
 
 def get_symbol_precision(symbol):
@@ -475,8 +475,16 @@ def process_data(data):
     """
     global precision, active_positions, last_price
     try:
-        # Обробка повідомлення тікера
+        # Отримуємо поточну ціну
         current_price = float(data['lastPrice'])
+
+        # Перевірка останньої (попередньої) отриманої ціни
+        global last_price
+        if last_price == 0:
+            last_price = current_price
+            return # Ігноруємо перше повідомлення, яке встановлює базову ціну
+
+        # Перевірка на зміну ціни
         if current_price == last_price:
             return # Ігноруємо, якщо ціна не змінилася
 
@@ -518,9 +526,14 @@ def process_data(data):
 def main():
     """
     Головна функція для запуску бота.
-    Вона ініціалізує з'єднання, завантажує позиції та підписується на стрім тікерів.
+    Вона ініціалізує з'єднання та підписується на стрім тікерів.
     """
     print(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}")
+
+    # Запуск робочих потоків для обробки повідомлень
+    num_worker_threads = 2
+    for _ in range(num_worker_threads):
+        threading.Thread(target=worker, daemon=True).start()
 
     # Отримання точності символу
     global precision
@@ -533,16 +546,7 @@ def main():
     if active_positions:
         print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
     else:
-        print("📢 Активних позицій немає.")
-
-    # Ініціалізація останньої ціни
-    global last_price
-    last_price = float(session.get_tickers(category="spot", symbol=SYMBOL)['result']['list'][0]['lastPrice'])
-
-    # Запуск робочих потоків для обробки повідомлень
-    num_worker_threads = 2
-    for _ in range(num_worker_threads):
-        threading.Thread(target=worker, daemon=True).start()
+        print("📢 Активних позицій немає")
 
     # Підписка на стрім тікерів
     try:
@@ -554,7 +558,7 @@ def main():
             api_secret=API_SECRET
         )
         ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
-        print("виконано успішно.")
+        print("виконано успішно")
     except Exception as e:
         print(f"❌ завершено з помилкою: {e}")
         return
@@ -564,7 +568,7 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("🔴 Бот зупинено.")
+        print("🔴 Бот зупинено")
 
 # Точка входу
 if __name__ == "__main__":
