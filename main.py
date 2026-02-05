@@ -234,8 +234,11 @@ def check_and_execute_sell(current_price):
     """
     global session, precision, active_positions
     for pos in active_positions:
-        if current_price >= pos['price'] + PROFIT_TARGET:
+        sell_price = pos['price'] + PROFIT_TARGET
+        if current_price >= sell_price:
             try:
+                print(f"👀 Ціна {current_price} досягла рівня продажу {sell_price} для позиції купівлі по {pos['price']}")
+
                 # Округлюємо кількість ВНИЗ до потрібної точності
                 factor = 10 ** precision
 
