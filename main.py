@@ -259,7 +259,7 @@ def check_and_execute_sell(current_price):
                     print(f"⚠️ Недостатньо балансу {BASE_COIN}: Треба {needed_qty}, є {balance_qty}")
                     # Тут можна або пропустити, або спробувати продати те, що є:
                     # continue
-                    pos['qty'] = balance_qty
+                    needed_qty = balance_qty
 
                 print(f"💰 Спроба продажу по {current_price}...")
                 order = session.place_order(
@@ -267,7 +267,7 @@ def check_and_execute_sell(current_price):
                     symbol=SYMBOL,
                     side="Sell",
                     orderType="Market",
-                    qty=pos['qty']
+                    qty=format(needed_qty, f'.{precision}f')
                 )
                 if order.get('retCode') != 0:
                     print(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
