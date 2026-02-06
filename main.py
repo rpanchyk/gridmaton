@@ -53,6 +53,7 @@ session = None # Сесія API
 precision = 8 # Точність символу (кількість знаків після коми)
 active_positions = [] # Список активних позицій
 last_price = 0.0 # Остання ціна символу
+accept_messages = True # Флаг для прийому повідомлень з WebSocket
 
 def get_symbol_precision(symbol):
     """
@@ -176,7 +177,14 @@ def handle_message(message):
     Обробка повідомлень з WebSocket стріму тікерів.
     :param message: Повідомлення
     """
-    global data_queue
+    global data_queue, accept_messages
+
+    # Ігноруємо повідомлення, якщо прийом вимкнено
+    if not accept_messages:
+        print("⚠️ Прийом повідомлень тимчасово вимкнено")
+        return
+
+    # Додаємо повідомлення у чергу для обробки
     if 'data' in message:
         data_queue.put(message['data'])
 
@@ -184,15 +192,21 @@ def worker():
     """
     Обробка повідомлень з черги.
     """
-    global data_queue
+    global data_queue, accept_messages
     while True:
         data = data_queue.get()
         if data is None:
+            print("⚙️ Робочий потік зупинено")
             break
 
-        process_data(data)
-
-        data_queue.task_done()
+        try:
+            accept_messages = False # Блокування прийому нових повідомлень під час обробки
+            process_data(data)
+        except Exception as e:
+            print(f"❌ Помилка обробки даних: {e}")
+        finally:
+            accept_messages = True # Розблокування прийому повідомлень після обробки
+            data_queue.task_done()
 
 def process_data(data):
     """
