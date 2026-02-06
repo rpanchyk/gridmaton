@@ -46,6 +46,7 @@ if not API_KEY or not API_SECRET:
 
 # Ініціалізація глобальних змінних
 data_queue = queue.Queue() # Черга для обробки даних
+active_positions_lock = threading.Lock() # Блокування для активних позицій
 session = None # Сесія API
 precision = 8 # Точність символу (кількість знаків після коми)
 active_positions = [] # Список активних позицій
@@ -69,87 +70,84 @@ def load_positions(precision, force_api=False):
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     :param precision: Кількість знаків після коми для округлення кількості
     """
-    global session, active_positions
+    global active_positions_lock, session, active_positions
 
-    # Отримання балансу монети
-    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
-    if balance_info.get('retCode') != 0:
-        raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
-    balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-    usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
-    equity_qty = float(balance_info['result']['list'][0]['totalEquity'])
-    print(f"💲 Баланс: {format(balance_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity_qty, '.2f')} {QUOTE_COIN}")
+    # Блокування для уникнення конфліктів при оновленні активних позицій
+    with active_positions_lock:
+        # Отримання балансу монети
+        balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
+        if balance_info.get('retCode') != 0:
+            raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
+        balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+        usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
+        equity_qty = float(balance_info['result']['list'][0]['totalEquity'])
+        print(f"💲 Баланс: {format(balance_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity_qty, '.2f')} {QUOTE_COIN}")
 
-    print("⚓ Відновлення позицій...")
-    global active_positions
-    if os.path.exists(POSITIONS_FILE) and not force_api:
-        print("🔍 Відновлюємо позиції з локального файлу...")
-        with open(POSITIONS_FILE, "r") as f:
-            active_positions = json.load(f)
-        if not active_positions:
-            print("⚠️ Позицій для відновлення не знайдено.")
-        else:
-            return # Успішно завантажено з файлу
+        print("⚓ Відновлення позицій...")
+        if os.path.exists(POSITIONS_FILE) and not force_api:
+            print("🔍 Відновлюємо позиції з локального файлу...")
+            with open(POSITIONS_FILE, "r") as f:
+                active_positions = json.load(f)
 
-    print("🔍 Відновлюємо позиції з API...")
-    try:
-        # Отримання історії ордерів
-        history = session.get_order_history(
-            category="spot",
-            symbol=SYMBOL,
-            limit=100,
-            status="Filled",
-            execType="Trade"
-        )
-        if history.get('retCode') != 0:
-            raise ValueError(f"Помилка отримання історії ордерів: {history.get('retMsg')}")
-        trades = history['result']['list']
-        buys = [t for t in trades if t['side'] == 'Buy']
-        buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
-        # with open("buys.json", "w") as f:
-        #     json.dump(buys, f, indent=4)
+            if active_positions:
+                print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
+                return # Успішно завантажено з локального файлу
+            else:
+                print("⚠️ Позицій для відновлення не знайдено.")
 
-        # Відновлення позицій з історії ордерів
-        restored = []
-        if balance_qty > 0:
-            for b in buys:
-                fee = float(b['cumFeeDetail'][BASE_COIN]) if BASE_COIN in b['cumFeeDetail'] else 0
-                qty = float(b['cumExecQty']) - fee # Віднімаємо комісію в BTC
-                if balance_qty >= qty:
-                    restored.append({
-                        "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
-                        "side": "Buy",
-                        "price": float(b['avgPrice']),
-                        "qty": format(qty, f'.{precision+2}f'),
-                        "fee": format(fee, f'.{precision+2}f')
-                    })
-                    balance_qty -= qty
-                else:
-                    break
+        print("🔍 Відновлюємо позиції з API...")
+        try:
+            # Отримання історії ордерів
+            history = session.get_order_history(
+                category="spot",
+                symbol=SYMBOL,
+                limit=100,
+                status="Filled",
+                execType="Trade"
+            )
+            if history.get('retCode') != 0:
+                raise ValueError(f"Помилка отримання історії ордерів: {history.get('retMsg')}")
+            trades = history['result']['list']
+            buys = [t for t in trades if t['side'] == 'Buy']
+            buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
+            # with open("buys.json", "w") as f:
+            #     json.dump(buys, f, indent=4)
 
-        # Оновлення активних позицій
-        active_positions = restored
+            # Відновлення позицій з історії ордерів
+            restored = []
+            if balance_qty > 0:
+                for b in buys:
+                    fee = float(b['cumFeeDetail'][BASE_COIN]) if BASE_COIN in b['cumFeeDetail'] else 0
+                    qty = float(b['cumExecQty']) - fee # Віднімаємо комісію в BTC
+                    if balance_qty >= qty:
+                        restored.append({
+                            "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
+                            "side": "Buy",
+                            "price": float(b['avgPrice']),
+                            "qty": format(qty, f'.{precision+2}f'),
+                            "fee": format(fee, f'.{precision+2}f')
+                        })
+                        balance_qty -= qty
+                    else:
+                        break
 
-        if not active_positions:
-            print("⚠️ Позицій для відновлення не знайдено.")
-        
-        # Збереження позицій
-        save_positions()
-    except Exception as e:
-        print(f"❌ Помилка відновлення: {e}")
+            # Сортуємо за ціною (від більшої до меншої)
+            restored.sort(key=lambda x: x['price'], reverse=True)
 
-def save_positions():
-    """
-    Зберігає активні позиції у файлі.
-    """
-    global active_positions
+            # Оновлення активних позицій
+            active_positions = restored
 
-    # Сортуємо за ціною (від більшої до меншої)
-    active_positions.sort(key=lambda x: x['price'], reverse=True)
+            if active_positions:
+                print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
+            else:
+                print("⚠️ Позицій для відновлення не знайдено.")
+            
+            # Збереження позицій у файл
+            with open(POSITIONS_FILE, "w") as f:
+                json.dump(active_positions, f, indent=4)
 
-    # Зберігаємо у файл
-    with open(POSITIONS_FILE, "w") as f:
-        json.dump(active_positions, f, indent=4)
+        except Exception as e:
+            print(f"❌ Помилка відновлення: {e}")
 
 def handle_message(message):
     """
@@ -566,10 +564,6 @@ def main():
     # Завантаження поточних позицій
     global active_positions
     load_positions(precision)
-    if active_positions:
-        print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
-    else:
-        print("📢 Активних позицій немає")
 
     # Запуск робочого потоку для обробки повідомлень
     threading.Thread(target=worker, daemon=True).start()
