@@ -74,18 +74,14 @@ def load_positions(precision, force_api=False):
 
     # Блокування для уникнення конфліктів при оновленні активних позицій
     with active_positions_lock:
-        # Отримання балансу монети
-        balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
-        if balance_info.get('retCode') != 0:
-            raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
-        balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
-        usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
-        equity_qty = float(balance_info['result']['list'][0]['totalEquity'])
-        print(f"💲 Баланс: {format(balance_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')}) та {format(equity_qty, '.2f')} {QUOTE_COIN}")
+        # Отримання балансу гаманця
+        balance_qty, usd_value, total_equity = get_wallet_balance()
+        print(f"💲 Баланс: {format(balance_qty, f'.{precision}f')} {BASE_COIN} (${format(usd_value, '.2f')})", end="")
+        print(f", загальна еквіті: {format(total_equity, '.2f')} {QUOTE_COIN}", end="")
+        print("", flush=True)
 
-        print("⚓ Відновлення позицій...")
-        if os.path.exists(POSITIONS_FILE) and not force_api:
-            print("🔍 Відновлюємо позиції з локального файлу...")
+        if not force_api and os.path.exists(POSITIONS_FILE):
+            print("🔍 Відновлення позицій з локального файлу...")
             with open(POSITIONS_FILE, "r") as f:
                 active_positions = json.load(f)
 
@@ -95,7 +91,7 @@ def load_positions(precision, force_api=False):
             else:
                 print("⚠️ Позицій для відновлення не знайдено.")
 
-        print("🔍 Відновлюємо позиції з API...")
+        print("🔍 Відновлення позицій з API...")
         try:
             # Отримання історії ордерів
             history = session.get_order_history(
@@ -141,13 +137,30 @@ def load_positions(precision, force_api=False):
                 print(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
             else:
                 print("⚠️ Позицій для відновлення не знайдено.")
-            
+
             # Збереження позицій у файл
             with open(POSITIONS_FILE, "w") as f:
                 json.dump(active_positions, f, indent=4)
+            print("💾 Стан позицій збережено у локальний файл.")
 
         except Exception as e:
             print(f"❌ Помилка відновлення: {e}")
+
+def get_wallet_balance():
+    """
+    Отримання балансу гаманця для вказаної монети.
+    :return: Баланс монети (кількість, USD вартість, загальна вартість)
+    """
+    global session
+    # Отримання балансу монети
+    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
+    if balance_info.get('retCode') != 0:
+        raise ValueError(f"Помилка отримання балансу: {balance_info.get('retMsg')}")
+
+    balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+    usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
+    total_equity = float(balance_info['result']['list'][0]['totalEquity'])
+    return balance_qty, usd_value, total_equity
 
 def handle_message(message):
     """
@@ -233,17 +246,13 @@ def check_and_execute_sell(current_price):
             try:
                 print(f"👀 Ціна {current_price} досягла рівня продажу {sell_price} для позиції купівлі по {pos['price']}")
 
+                # Отримуємо баланс гаманця
+                balance_qty, _, _ = get_wallet_balance()
+
                 # Округлюємо кількість ВНИЗ до потрібної точності
                 factor = 10 ** precision
 
-                # Отримуємо баланс монети
-                balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
-                if balance_info.get('retCode') != 0:
-                    print(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
-                    return
-
-                # Отримуємо доступний баланс
-                balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+                # Доступний баланс
                 balance_qty = math.floor(balance_qty * factor) / factor
                 print(f"💲 Баланс {BASE_COIN}: {balance_qty}")
                 
@@ -563,7 +572,7 @@ def main():
 
     # Завантаження поточних позицій
     global active_positions
-    load_positions(precision)
+    load_positions(precision, force_api=True)
 
     # Запуск робочого потоку для обробки повідомлень
     threading.Thread(target=worker, daemon=True).start()
