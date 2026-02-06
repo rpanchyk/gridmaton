@@ -408,16 +408,9 @@ def get_next_lower_buy_level():
     if not active_positions:
         return level
 
-    # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
-    for p in active_positions:
-        p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        if level == p_level:
-            level -= LEVEL_STEP # Зсув рівня вниз
-            break
-
     # Якщо тип сітки лінійний, повертаємо розрахований рівень
-    if GRID_TYPE == GridType.LINEAR:
-        return level
+    # if GRID_TYPE == GridType.LINEAR:
+    #     return level
 
     # Коригування рівня відповідно до послідовності Фібоначчі
     if GRID_TYPE == GridType.FIBO:
@@ -432,6 +425,14 @@ def get_next_lower_buy_level():
                     level = last_position_level - LEVEL_STEP * diff # Зсув рівня вниз
                 break
             prev_fibo = curr_fibo
+
+    # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
+    for p in active_positions:
+        p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        if abs(level - p_level) < (LEVEL_STEP / 2):
+            level -= LEVEL_STEP # Зсув рівня вниз
+            # print(f"📌 Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
+            break
 
     return level
 
