@@ -90,6 +90,9 @@ def load_positions(precision, force_api=False):
         if force_api or not active_positions:
             print("🔍 Відновлення позицій з API...")
             try:
+                # Отримання балансу гаманця
+                balance_qty, _, _ = get_wallet_balance()
+
                 print("📜 Отримання історії ордерів...")
                 history = session.get_order_history(
                     category="spot",
@@ -108,9 +111,6 @@ def load_positions(precision, force_api=False):
                 buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
                 # with open("buys.json", "w") as f:
                 #     json.dump(buys, f, indent=4)
-
-                # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance()
 
                 # Відновлення позицій з історії ордерів
                 restored = []
@@ -318,7 +318,7 @@ def check_and_execute_sell(current_price):
                     # Отримуємо інформацію про ордер з історії
                     trades = history['result']['list']
                     if not trades:
-                        print(f"⚠️ Історія ордерів порожня для ID: {order_id}")
+                        print(f"⚠️ Ордер {order_id} не знайдено в історії ордерів")
                         continue
 
                     order_data = trades[0]
@@ -462,10 +462,10 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     # Визначення рівня купівлі, який було перетнуто
     level = None
     if last_price > lower_buy_level and current_price <= lower_buy_level:
-        print(f"🧃 Перетин нижнього рівня купівлі {lower_buy_level} вниз")
+        print(f"🧃 Перетин нижнього рівня купівлі {lower_buy_level} вниз: остання ціна {last_price}, поточна ціна {current_price}")
         level = lower_buy_level
     elif last_price < upper_buy_level and current_price >= upper_buy_level:
-        print(f"🧃 Перетин верхнього рівня купівлі {upper_buy_level} вверх")
+        print(f"🧃 Перетин верхнього рівня купівлі {upper_buy_level} вверх: остання ціна {last_price}, поточна ціна {current_price}")
         level = upper_buy_level
     else:
         return # Рівень купівлі не перетнуто
@@ -505,7 +505,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             # Отримуємо інформацію про ордер з історії
             trades = history['result']['list']
             if not trades:
-                print(f"⚠️ Історія ордерів порожня для ID: {order_id}")
+                print(f"⚠️ Ордер {order_id} не знайдено в історії ордерів")
                 continue
             
             order_data = trades[0]
@@ -520,7 +520,11 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 load_positions(precision, force_api=True)
 
                 # Отримуємо реальні дані виконання
-                pos = active_positions[-1]
+                pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
+                if not pos:
+                    print(f"❌ Виконаний ордер {order_data['orderId']} не знайдено серед активних позицій")
+                    continue
+
                 exec_price = pos['price']
                 exec_qty = float(pos['qty'])
                 commission = float(pos['fee'])
