@@ -458,16 +458,16 @@ def get_next_lower_buy_level():
     # Коригування рівня відповідно до послідовності Фібоначчі
     if GRID_TYPE == GridType.FIBO:
         count = len(active_positions)
-        prev_fibo = 0
-        for curr_fibo in FIBO_NUMBERS:
-            if count < curr_fibo:
-                diff = curr_fibo - prev_fibo
+        prev = FIBO_NUMBERS[0]
+        for curr in FIBO_NUMBERS:
+            if count < curr:
+                diff = curr - prev
                 if diff > 1:
                     last_position = min(active_positions, key=lambda x: float(x['price'])) # Отримуємо позицію з найменшою ціною
                     last_position_level = (float(last_position['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
                     level = last_position_level - LEVEL_STEP * diff # Зсув рівня вниз
                 break
-            prev_fibo = curr_fibo
+            prev = curr
 
     # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
     for p in active_positions:
