@@ -137,6 +137,7 @@ cat trade.log
 - **README.md** - This documentation
 - **requirements.txt** - Python package dependencies
 - **trade.log** - Historical record of all executed trades (auto-managed)
+- **work.log** - Operational log for monitoring (auto-managed)
 
 ## Development
 
