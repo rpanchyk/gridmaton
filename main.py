@@ -53,7 +53,7 @@ active_positions_lock = threading.Lock() # Блокування для акти�
 session = None # Сесія API
 precision = 8 # Точність символу (кількість знаків після коми)
 active_positions = [] # Список активних позицій
-last_price = 0.0 # Остання ціна символу
+last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
 
 def get_symbol_precision(symbol):
@@ -254,6 +254,10 @@ def process_data(data):
         message += f" | Наст.купівля зверху: {f"{next_upper_buy_level:.2f}"}"
         message += f" | Наст.продаж: {f"{next_sell_price:.2f}" if next_sell_price else "немає"}"
         log(message, file_output=False)
+
+        # Періодично логуєм в файл
+        if int(datetime.now().timestamp()) % 60 == 0:
+            log(message, console_output=False)
 
         # Оновлення останньої ціни
         last_price = current_price
