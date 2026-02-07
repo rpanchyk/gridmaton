@@ -130,7 +130,7 @@ def load_positions(force_api=True):
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
                 trades = history['result']['list']
-                log(f"✨ Отримано {len(trades)} ордерів з історії")
+                log(f"⛽ Отримано {len(trades)} ордерів з історії")
 
                 # Фільтрація та сортування купівельних ордерів
                 buys = [t for t in trades if t['side'] == 'Buy']
@@ -365,7 +365,7 @@ def check_and_execute_sell(current_price):
                         continue
 
                     order_data = trades[0]
-                    log(f"⛎ Ордер {order_data['orderId']} отримано з історії")
+                    log(f"⛽ Ордер {order_data['orderId']} отримано з історії")
 
                     # Перевіряємо статус ордера
                     status = order_data['orderStatus']
@@ -396,9 +396,6 @@ def check_and_execute_sell(current_price):
 
                         # Оповіщаємо в Telegram
                         send_telegram(message)
-
-                        # Скидаємо останню ціну
-                        last_price = 0
 
                         is_filled = True
                         break
@@ -472,7 +469,7 @@ def get_next_lower_buy_level():
     # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
     for p in active_positions:
         p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-        if abs(level - p_level) < (LEVEL_STEP / 2):
+        if math.isclose(level, p_level):
             level -= LEVEL_STEP # Зсув рівня вниз
             # log(f"Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
             break
@@ -509,6 +506,13 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
         level = upper_buy_level
     else:
         return # Рівень купівлі не перетнуто
+
+    # Перевірка, чи є активна позиція на цьому рівні
+    for p in active_positions:
+        p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        if math.isclose(level, p_level):
+            log(f"⚠️ Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита {p['date']}")
+            return
 
     try:
         log(f"⚽ Спроба купівлі на рівні {level}...")
@@ -547,9 +551,9 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             if not trades:
                 log(f"⚠️ Ордер {order_id} не знайдено в історії ордерів")
                 continue
-            
+
             order_data = trades[0]
-            log(f"⛎ Ордер {order_data['orderId']} отримано з історії")
+            log(f"⛽ Ордер {order_data['orderId']} отримано з історії")
 
             # Перевіряємо статус ордера
             status = order_data['orderStatus']
@@ -579,9 +583,6 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
 
                 # Оповіщаємо в Telegram
                 send_telegram(message)
-
-                # Скидаємо останню ціну
-                last_price = 0
 
                 is_filled = True
                 break
