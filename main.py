@@ -265,7 +265,7 @@ def check_and_execute_sell(current_price):
     Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     """
-    global session, precision, active_positions
+    global session, precision, active_positions, last_price
     for pos in active_positions:
         sell_price = pos['price'] + PROFIT_TARGET
         if current_price >= sell_price:
@@ -370,6 +370,9 @@ def check_and_execute_sell(current_price):
 
                         # Оповіщаємо в Telegram
                         send_telegram(message)
+
+                        # Скидаємо останню ціну
+                        last_price = 0
 
                         is_filled = True
                         break
@@ -556,6 +559,9 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
 
                 # Оповіщаємо в Telegram
                 send_telegram(message)
+
+                # Скидаємо останню ціну
+                last_price = 0
 
                 is_filled = True
                 break
