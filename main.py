@@ -64,7 +64,7 @@ def load_instruments_info():
     """
     Отримання інформації про символ.
     """
-    global session, base_coin, quote_coin, base_precision, quote_precision
+    global base_coin, quote_coin, base_precision, quote_precision
 
     # Отримання інформації про символ
     instrument_info = session.get_instruments_info(category="spot", symbol=SYMBOL)
@@ -97,7 +97,7 @@ def load_positions(force_api=True):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     """
-    global active_positions_lock, session, base_precision, active_positions
+    global active_positions
 
     # Блокування для уникнення конфліктів при оновленні активних позицій
     with active_positions_lock:
@@ -179,10 +179,9 @@ def get_wallet_balance(log_output=True):
     Отримання балансу гаманця для вказаної монети.
     :return: Баланс монети (кількість, USD вартість, загальна вартість)
     """
-    global session
-
     if log_output:
         log("⛳ Отримання балансу гаманця...")
+
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
@@ -204,8 +203,6 @@ def handle_message(message):
     Обробка повідомлень з WebSocket стріму тікерів.
     :param message: Повідомлення
     """
-    global data_queue, accept_messages
-
     # Ігноруємо повідомлення, якщо прийом вимкнено
     if not accept_messages:
         # log("⚠️ Прийом повідомлень тимчасово вимкнено")
@@ -219,7 +216,7 @@ def worker(stop_event):
     """
     Обробка повідомлень з черги.
     """
-    global data_queue, accept_messages
+    global accept_messages
 
     # Очікуємо нове повідомлення в черзі
     while not stop_event.is_set():
@@ -242,7 +239,7 @@ def process_data(data):
     Обробка отриманих даних.
     :param data: Дані повідомлення
     """
-    global active_positions, last_price
+    global last_price
 
     try:
         # Отримуємо поточну ціну
@@ -295,7 +292,7 @@ def check_and_execute_sell(current_price):
     Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     """
-    global session, base_precision, active_positions, last_price
+    global last_price
 
     for pos in active_positions:
         sell_price = float(pos['price']) + PROFIT_TARGET
@@ -447,8 +444,6 @@ def get_next_lower_buy_level():
     Розрахунок наступного нижнього рівня купівлі.
     :return: Розрахований рівень купівлі
     """
-    global active_positions, last_price
-
     # Розрахунок рівня на основі кроку та зсуву для поточної ціни
     level = ((last_price - LEVEL_OFFSET) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
 
@@ -489,8 +484,6 @@ def get_next_upper_buy_level():
     Розрахунок наступного верхнього рівня купівлі.
     :return: Розрахований рівень купівлі
     """
-    global active_positions, last_price
-
     max_price = max([float(p['price']) for p in active_positions]) if active_positions else None
     price = max_price if max_price else last_price
     level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET + LEVEL_STEP
@@ -504,7 +497,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     :param lower_buy_level: Нижній рівень купівлі
     :param upper_buy_level: Верхній рівень купівлі
     """
-    global session, base_precision, active_positions, last_price
+    global last_price
 
     # Визначення рівня купівлі, який було перетнуто
     level = None
