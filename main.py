@@ -48,7 +48,7 @@ if not API_KEY or not API_SECRET:
     raise ValueError("Ключі API_KEY та API_SECRET мають бути встановлені у файлі .env")
 
 # Ініціалізація глобальних змінних
-data_queue = queue.Queue() # Черга для обробки даних
+data_queue = queue.Queue(maxsize=1000) # Черга для обробки даних
 active_positions_lock = threading.Lock() # Блокування для активних позицій
 session = None # Сесія API
 precision = 8 # Точність символу (кількість знаків після коми)
@@ -191,12 +191,14 @@ def handle_message(message):
     if 'data' in message:
         data_queue.put(message['data'])
 
-def worker():
+def worker(stop_event):
     """
     Обробка повідомлень з черги.
     """
     global data_queue, accept_messages
-    while True:
+
+    # Очікуємо нове повідомлення в черзі
+    while not stop_event.is_set():
         data = data_queue.get()
         if data is None:
             log("⚙️ Робочий потік зупинено")
@@ -650,7 +652,8 @@ def main():
     log(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}")
 
     # Ініціалізація сесії API
-    global session
+    global session, precision
+
     try:
         log("🔗 Підключення до біржі ", end="")
         session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
@@ -660,16 +663,16 @@ def main():
         return
 
     # Отримання точності символу
-    global precision
     precision = get_symbol_precision(SYMBOL)
     log(f"🤺 Точність символу {SYMBOL}: {precision} знаків після коми")
 
     # Завантаження поточних позицій
-    global active_positions
     load_positions(precision, force_api=True)
 
-    # Запуск робочого потоку для обробки повідомлень
-    threading.Thread(target=worker, daemon=True).start()
+    # Запуск робочого потоку для обробки черги повідомлень з веб-сокета
+    worker_stop_event = threading.Event()
+    worker_thread = threading.Thread(target=worker, args=(worker_stop_event,), daemon=True)
+    worker_thread.start()
     log("⚙️ Робочий потік запущено")
 
     # Ініціалізація веб-сокета для отримання тікерів
@@ -687,6 +690,8 @@ def main():
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        worker_stop_event.set()
+        worker_thread.join()
         log("🔴 Бот зупинено")
 
 # Точка входу
