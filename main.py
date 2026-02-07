@@ -130,7 +130,7 @@ def load_positions(precision, force_api=False):
                                 "order_id": b['orderId'],
                                 "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                                 "side": "Buy",
-                                "price": float(b['avgPrice']),
+                                "price": b['avgPrice'],
                                 "qty": format(qty, f'.{precision+2}f'),
                                 "fee": format(fee, f'.{precision+2}f')
                             })
@@ -139,7 +139,7 @@ def load_positions(precision, force_api=False):
                             break
 
                 # Сортуємо за ціною (від більшої до меншої)
-                restored.sort(key=lambda x: x['price'], reverse=True)
+                restored.sort(key=lambda x: float(x['price']), reverse=True)
 
                 # Оновлення активних позицій
                 active_positions = restored
@@ -249,7 +249,7 @@ def process_data(data):
         check_and_execute_buy(current_price, next_lower_buy_level, next_upper_buy_level)
 
         # Розрахунок наступного рівня продажу
-        next_sell_price = min([p['price'] + PROFIT_TARGET for p in active_positions]) if active_positions else None
+        next_sell_price = min([float(p['price']) + PROFIT_TARGET for p in active_positions]) if active_positions else None
 
         # Виведення інформації
         message = f"Минула ціна: {f"{last_price:.2f}"}"
@@ -279,10 +279,10 @@ def check_and_execute_sell(current_price):
     global session, precision, active_positions, last_price
 
     for pos in active_positions:
-        sell_price = pos['price'] + PROFIT_TARGET
+        sell_price = float(pos['price']) + PROFIT_TARGET
         if current_price >= sell_price:
             try:
-                log(f"⚾ Ціна {current_price} досягла рівня продажу {sell_price} для позиції купівлі по {pos['price']}")
+                log(f"⚾ Ціна {current_price:.2f} досягла рівня продажу {sell_price:.2f} для позиції купівлі по {pos['price']}")
 
                 # Отримання балансу гаманця
                 balance_qty, _, _ = get_wallet_balance()
@@ -296,7 +296,7 @@ def check_and_execute_sell(current_price):
                 # Потрібна кількість для продажу
                 needed_qty = float(pos['qty'])
                 needed_qty = math.floor(needed_qty * factor) / factor
-                log(f"✊ Потрібно продати: {needed_qty} {BASE_COIN}")
+                log(f"✊ Потрібно продати: {format(needed_qty, f'.{precision+2}f'):} {BASE_COIN}")
 
                 # Перевіряємо, чи вистачає балансу
                 if balance_qty < needed_qty:
@@ -363,7 +363,7 @@ def check_and_execute_sell(current_price):
 
                         # Отримуємо реальну ціну виконання
                         exec_price = float(order_data.get('avgPrice', current_price))
-                        profit = (exec_price - pos['price']) * float(pos['qty'])
+                        profit = (exec_price - float(pos['price'])) * float(pos['qty'])
 
                         # Отримуємо час виконання
                         exec_time = order_data.get('execTime', 0)
@@ -451,15 +451,15 @@ def get_next_lower_buy_level():
             if count < curr_fibo:
                 diff = curr_fibo - prev_fibo
                 if diff > 1:
-                    last_position = min(active_positions, key=lambda x: x['price'])
-                    last_position_level = (last_position['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+                    last_position = min(active_positions, key=lambda x: float(x['price'])) # Отримуємо позицію з найменшою ціною
+                    last_position_level = (float(last_position['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
                     level = last_position_level - LEVEL_STEP * diff # Зсув рівня вниз
                 break
             prev_fibo = curr_fibo
 
     # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
     for p in active_positions:
-        p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
         if abs(level - p_level) < (LEVEL_STEP / 2):
             level -= LEVEL_STEP # Зсув рівня вниз
             # log(f"Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
@@ -474,7 +474,7 @@ def get_next_upper_buy_level():
     """
     global active_positions, last_price
 
-    max_price = max([p['price'] for p in active_positions]) if active_positions else None
+    max_price = max([float(p['price']) for p in active_positions]) if active_positions else None
     price = max_price if max_price else last_price
     level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET + LEVEL_STEP
 
@@ -555,11 +555,11 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                     log(f"❌ Виконаний ордер {order_data['orderId']} не знайдено серед активних позицій")
                     continue
 
-                exec_price = pos['price']
+                exec_price = float(pos['price'])
                 exec_qty = float(pos['qty'])
                 commission = float(pos['fee'])
 
-                message = f"⛺ Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                message = f"⛺ Куплено {exec_qty} {BASE_COIN} по ціні {format(exec_price, '.2f')} {QUOTE_COIN}"
                 message += f", що становить {format(exec_qty * exec_price, '.2f')} {QUOTE_COIN}"
                 message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
                 log(message)
@@ -620,7 +620,7 @@ def log_trade(pos, action, exec_price, profit=None):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # Формуємо базову частину повідомлення
-    message = f"[{timestamp}] {action.upper()}{' ' if action.upper() == 'BUY' else ''} | {SYMBOL} | Price: {exec_price} | Qty: {pos['qty']}"
+    message = f"[{timestamp}] {action.upper()}{' ' if action.upper() == 'BUY' else ''} | {SYMBOL} | Price: {exec_price:.2f} | Qty: {pos['qty']}"
 
     # Якщо це продаж, додаємо ціну купівлі та профіт
     if action.upper() == "SELL":
