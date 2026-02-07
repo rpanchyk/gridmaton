@@ -405,7 +405,7 @@ def format_timedelta(timedelta):
     """
     Форматує timedelta об'єкт в читабельний формат.
     :param timedelta: timedelta об'єкт
-    :return: Рядок з форматованим часом (наприклад, "2 дні, 3 години, 15 хвилин")
+    :return: Рядок з форматованим часом (наприклад, "2д 3год 15хв 25сек")
     """
     total_seconds = int(timedelta.total_seconds())
     days = total_seconds // 86400
@@ -415,15 +415,15 @@ def format_timedelta(timedelta):
 
     parts = []
     if days > 0:
-        parts.append(f"{days} {'день' if days == 1 else 'дні' if days % 10 in [2, 3, 4] else 'днів'}")
+        parts.append(f"{days}{'д'}")
     if hours > 0:
-        parts.append(f"{hours} {'година' if hours == 1 else 'години' if hours % 10 in [2, 3, 4] else 'годин'}")
+        parts.append(f"{hours}{'год'}")
     if minutes > 0:
-        parts.append(f"{minutes} {'хвилина' if minutes == 1 else 'хвилини' if minutes % 10 in [2, 3, 4] else 'хвилин'}")
+        parts.append(f"{minutes}{'хв'}")
     if seconds > 0 or not parts:
-        parts.append(f"{seconds} {'секунда' if seconds == 1 else 'секунди' if seconds % 10 in [2, 3, 4] else 'секунд'}")
+        parts.append(f"{seconds}{'сек'}")
 
-    return ", ".join(parts)
+    return " ".join(parts)
 
 def get_next_lower_buy_level():
     """
