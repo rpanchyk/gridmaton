@@ -116,9 +116,6 @@ def load_positions(force_api=True):
         if force_api or not active_positions:
             log("⚡ Відновлення позицій з API...")
             try:
-                # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance(log_output=False)
-
                 log("⛽ Отримання історії ордерів...")
                 history = session.get_order_history(
                     category="spot",
@@ -129,6 +126,8 @@ def load_positions(force_api=True):
                 )
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
+
+                # Отримуємо інформацію про ордери з історії
                 trades = history['result']['list']
                 log(f"⛽ Отримано {len(trades)} ордерів з історії")
 
@@ -137,6 +136,9 @@ def load_positions(force_api=True):
                 buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
                 # with open("buys.json", "w") as f:
                 #     json.dump(buys, f, indent=4)
+
+                # Отримання балансу гаманця
+                balance_qty, _, _ = get_wallet_balance(log_output=False)
 
                 # Відновлення позицій з історії ордерів
                 restored = []
