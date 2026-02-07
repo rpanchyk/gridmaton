@@ -92,7 +92,7 @@ def load_positions(precision, force_api=False):
             print("🔍 Відновлення позицій з API...")
             try:
                 # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance()
+                balance_qty, _, _ = get_wallet_balance(skip_log=True)
 
                 print("📜 Отримання історії ордерів...")
                 history = session.get_order_history(
@@ -149,14 +149,15 @@ def load_positions(precision, force_api=False):
         else:
             print("⚠️ Позицій для відновлення не знайдено")
 
-def get_wallet_balance():
+def get_wallet_balance(skip_log=False):
     """
     Отримання балансу гаманця для вказаної монети.
     :return: Баланс монети (кількість, USD вартість, загальна вартість)
     """
     global session
 
-    print("💼 Отримання балансу гаманця...")
+    if not skip_log:
+        print("💼 Отримання балансу гаманця...")
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
@@ -165,10 +166,11 @@ def get_wallet_balance():
     usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
     total_equity = float(balance_info['result']['list'][0]['totalEquity'])
 
-    print(f"💲 Баланс: {format(balance_qty, f'.{precision+2}f')} {BASE_COIN}", end="")
-    print(f" (${format(usd_value, '.2f')})", end="")
-    print(f", загальна еквіті: {format(total_equity, '.2f')} {QUOTE_COIN}", end="")
-    print("", flush=True)
+    if not skip_log:
+        print(f"💲 Баланс: {format(balance_qty, f'.{precision+2}f')} {BASE_COIN}", end="")
+        print(f" (${format(usd_value, '.2f')})", end="")
+        print(f", загальна еквіті: {format(total_equity, '.2f')} {QUOTE_COIN}", end="")
+        print("", flush=True)
 
     return balance_qty, usd_value, total_equity
 
