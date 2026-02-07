@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 from enum import Enum
 from pybit.unified_trading import HTTP, WebSocket
 
+# Сумісні іконки для консолі:
+# ☔☕♈♉♊♋♌♍♎♏♐♑♒♓⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⚙️⚠️
+
 # Перелік типів сітки
 class GridType(Enum):
     LINEAR = 1
@@ -63,6 +66,7 @@ def get_symbol_precision(symbol):
     :return: Точність символу
     """
     global session
+
     info = session.get_instruments_info(category="spot", symbol=symbol)
     if not info['result']['list']:
         raise ValueError("Невірний символ або відсутня інформація про нього.")
@@ -78,24 +82,25 @@ def load_positions(precision, force_api=False):
 
     # Блокування для уникнення конфліктів при оновленні активних позицій
     with active_positions_lock:
-        log("🔄 Відновлення позицій...")
+        log("⚡ Відновлення позицій...")
 
         if not force_api:
             if os.path.exists(POSITIONS_FILE):
-                log("🔍 Відновлення позицій з локального файлу...")
+                log("⚡ Відновлення позицій з файлу...")
                 try:
                     with open(POSITIONS_FILE, "r") as f:
                         active_positions = json.load(f)
+                    log(f"✨ Отримано {len(active_positions)} ордерів з файлу")
                 except Exception as e:
                     log(f"❌ Помилка відновлення: {e}")
 
         if force_api or not active_positions:
-            log("🔍 Відновлення позицій з API...")
+            log("⚡ Відновлення позицій з API...")
             try:
                 # Отримання балансу гаманця
                 balance_qty, _, _ = get_wallet_balance(log_output=False)
 
-                log("📜 Отримання історії ордерів...")
+                log("⛽ Отримання історії ордерів...")
                 history = session.get_order_history(
                     category="spot",
                     symbol=SYMBOL,
@@ -106,7 +111,7 @@ def load_positions(precision, force_api=False):
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
                 trades = history['result']['list']
-                log(f"📊 Отримано {len(trades)} ордерів з історії")
+                log(f"✨ Отримано {len(trades)} ордерів з історії")
 
                 # Фільтрація та сортування купівельних ордерів
                 buys = [t for t in trades if t['side'] == 'Buy']
@@ -146,7 +151,7 @@ def load_positions(precision, force_api=False):
                 log(f"❌ Помилка відновлення: {e}")
 
         if active_positions:
-            log(f"📢 Активні позиції ({len(active_positions)} шт.): {active_positions}")
+            log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
         else:
             log("⚠️ Позицій для відновлення не знайдено")
 
@@ -158,7 +163,7 @@ def get_wallet_balance(log_output=True):
     global session
 
     if log_output:
-        log("💼 Отримання балансу гаманця...")
+        log("⛳ Отримання балансу гаманця...")
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
@@ -168,7 +173,7 @@ def get_wallet_balance(log_output=True):
     total_equity = float(balance_info['result']['list'][0]['totalEquity'])
 
     if log_output:
-        message = f"💲 Баланс: {format(balance_qty, f'.{precision+2}f')} {BASE_COIN}"
+        message = f"⛳ Баланс: {format(balance_qty, f'.{precision+2}f')} {BASE_COIN}"
         message += f" (${format(usd_value, '.2f')})"
         message += f", загальна еквіті: {format(total_equity, '.2f')} {QUOTE_COIN}"
         log(message)
@@ -219,12 +224,12 @@ def process_data(data):
     :param data: Дані повідомлення
     """
     global precision, active_positions, last_price
+
     try:
         # Отримуємо поточну ціну
         current_price = float(data['lastPrice'])
 
         # Перевірка останньої (попередньої) отриманої ціни
-        global last_price
         if last_price <= 0:
             last_price = current_price
             return # Ігноруємо перше повідомлення, яке встановлює базову ціну
@@ -272,11 +277,12 @@ def check_and_execute_sell(current_price):
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     """
     global session, precision, active_positions, last_price
+
     for pos in active_positions:
         sell_price = pos['price'] + PROFIT_TARGET
         if current_price >= sell_price:
             try:
-                log(f"👀 Ціна {current_price} досягла рівня продажу {sell_price} для позиції купівлі по {pos['price']}")
+                log(f"⚾ Ціна {current_price} досягла рівня продажу {sell_price} для позиції купівлі по {pos['price']}")
 
                 # Отримання балансу гаманця
                 balance_qty, _, _ = get_wallet_balance()
@@ -290,7 +296,7 @@ def check_and_execute_sell(current_price):
                 # Потрібна кількість для продажу
                 needed_qty = float(pos['qty'])
                 needed_qty = math.floor(needed_qty * factor) / factor
-                log(f"Потрібно продати: {needed_qty} {BASE_COIN}")
+                log(f"✊ Потрібно продати: {needed_qty} {BASE_COIN}")
 
                 # Перевіряємо, чи вистачає балансу
                 if balance_qty < needed_qty:
@@ -307,7 +313,7 @@ def check_and_execute_sell(current_price):
 
                     break
 
-                log(f"💰 Спроба продажу по {current_price}...")
+                log(f"⚽ Спроба продажу по {current_price}...")
                 order = session.place_order(
                     category="spot",
                     symbol=SYMBOL,
@@ -320,14 +326,14 @@ def check_and_execute_sell(current_price):
                     continue
 
                 order_id = order['result']['orderId']
-                log(f"🚚 Ордер {order_id} розміщено. Очікування виконання...")
+                log(f"⛵ Ордер {order_id} розміщено. Очікування виконання...")
                 is_filled = False
 
                 # Перевірка статусу
                 for _ in range(RETRY_NUMBER):
                     time.sleep(RETRY_DELAY) # Затримка перед перевіркою
 
-                    log("📜 Отримання історії ордерів...")
+                    log("⛽ Отримання історії ордерів...")
                     history = session.get_order_history(
                         category="spot",
                         symbol=SYMBOL,
@@ -345,7 +351,7 @@ def check_and_execute_sell(current_price):
                         continue
 
                     order_data = trades[0]
-                    log(f"📊 Ордер {order_data['orderId']} отримано з історії")
+                    log(f"⛎ Ордер {order_data['orderId']} отримано з історії")
 
                     # Перевіряємо статус ордера
                     status = order_data['orderStatus']
@@ -364,7 +370,7 @@ def check_and_execute_sell(current_price):
                         exec_time = datetime.fromtimestamp(int(exec_time)/1000) if exec_time else datetime.now()
                         timedelta = exec_time - datetime.strptime(pos['date'], '%Y-%m-%d %H:%M:%S')
 
-                        message = f"💰 Продано {pos['qty']} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                        message = f"⚽ Продано {pos['qty']} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
                         message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {QUOTE_COIN}"
                         message += f", прибуток {format(profit, '.2f')} {QUOTE_COIN}."
                         message += f" Ордер був розміщений {pos['date']} та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
@@ -383,14 +389,14 @@ def check_and_execute_sell(current_price):
                         is_filled = True
                         break
                     elif status in ["Cancelled", "Rejected"]:
-                        log(f"⚠️ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
+                        log(f"❎ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
                         break
                     else:
-                        log(f"⏳ Ордер {order_data['orderId']} не виконано, статус: {status}")
+                        log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status}")
                         continue
 
                 if not is_filled:
-                    log(f"⚠️ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
+                    log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
 
             except Exception as e:
                 log(f"❌ КРИТИЧНА ПОМИЛКА при продажі: {e}")
@@ -424,7 +430,6 @@ def get_next_lower_buy_level():
     Розрахунок наступного нижнього рівня купівлі.
     :return: Розрахований рівень купівлі
     """
-    global GRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS
     global active_positions, last_price
 
     # Розрахунок рівня на основі кроку та зсуву для поточної ціни
@@ -457,7 +462,7 @@ def get_next_lower_buy_level():
         p_level = (p['price'] // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
         if abs(level - p_level) < (LEVEL_STEP / 2):
             level -= LEVEL_STEP # Зсув рівня вниз
-            # log(f"📌 Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
+            # log(f"Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
             break
 
     return level
@@ -467,7 +472,6 @@ def get_next_upper_buy_level():
     Розрахунок наступного верхнього рівня купівлі.
     :return: Розрахований рівень купівлі
     """
-    global GRID_TYPE, LEVEL_STEP, LEVEL_OFFSET, FIBO_NUMBERS
     global active_positions, last_price
 
     max_price = max([p['price'] for p in active_positions]) if active_positions else None
@@ -488,16 +492,16 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     # Визначення рівня купівлі, який було перетнуто
     level = None
     if last_price > lower_buy_level and current_price <= lower_buy_level:
-        log(f"🧃 Перетин нижнього рівня купівлі {lower_buy_level} вниз: остання ціна {last_price}, поточна ціна {current_price}")
+        log(f"✋ Перетин нижнього рівня купівлі {lower_buy_level} вниз: остання ціна {last_price}, поточна ціна {current_price}")
         level = lower_buy_level
     elif last_price < upper_buy_level and current_price >= upper_buy_level:
-        log(f"🧃 Перетин верхнього рівня купівлі {upper_buy_level} вверх: остання ціна {last_price}, поточна ціна {current_price}")
+        log(f"✋ Перетин верхнього рівня купівлі {upper_buy_level} вверх: остання ціна {last_price}, поточна ціна {current_price}")
         level = upper_buy_level
     else:
         return # Рівень купівлі не перетнуто
 
     try:
-        log(f"🛒 Спроба купівлі на рівні {level}...")
+        log(f"⚽ Спроба купівлі на рівні {level}...")
         order = session.place_order(
             category="spot",
             symbol=SYMBOL,
@@ -510,14 +514,14 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             return
 
         order_id = order['result']['orderId']
-        log(f"🚚 Ордер {order_id} розміщено. Очікування виконання...")
+        log(f"⛵ Ордер {order_id} розміщено. Очікування виконання...")
         is_filled = False
 
         # Перевірка статусу
         for _ in range(RETRY_NUMBER):
             time.sleep(RETRY_DELAY) # Затримка перед перевіркою
 
-            log("📜 Отримання історії ордерів...")
+            log("⛽ Отримання історії ордерів...")
             history = session.get_order_history(
                 category="spot",
                 symbol=SYMBOL,
@@ -535,7 +539,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 continue
             
             order_data = trades[0]
-            log(f"📊 Ордер {order_data['orderId']} отримано з історії")
+            log(f"⛎ Ордер {order_data['orderId']} отримано з історії")
 
             # Перевіряємо статус ордера
             status = order_data['orderStatus']
@@ -555,7 +559,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 exec_qty = float(pos['qty'])
                 commission = float(pos['fee'])
 
-                message = f"📥 Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
+                message = f"⛺ Куплено {exec_qty} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
                 message += f", що становить {format(exec_qty * exec_price, '.2f')} {QUOTE_COIN}"
                 message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
                 log(message)
@@ -572,14 +576,14 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 is_filled = True
                 break
             elif status in ["Cancelled", "Rejected"]:
-                log(f"⚠️ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
+                log(f"❎ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
                 break
             else:
-                log(f"⏳ Ордер {order_data['orderId']} не виконано, статус: {status}")
+                log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status}")
                 continue
 
         if not is_filled:
-            log(f"⚠️ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
+            log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
 
     except Exception as e:
         log(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
@@ -631,13 +635,11 @@ def send_telegram(message):
     Відправка повідомлення в Telegram.
     :param message: Текст повідомлення
     """
-    global TELEGRAM_NOTIFICATIONS, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID
-
     if not TELEGRAM_NOTIFICATIONS:
         return
 
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        log("⚠️ Telegram токен або чат ID не встановлено.")
+        log("❌ Telegram токен або чат ID не встановлено.")
         return
 
     try:
@@ -652,14 +654,14 @@ def main():
     Головна функція для запуску бота.
     Вона ініціалізує з'єднання та підписується на стрім тікерів.
     """
-    log(empty_line=True)
-    log(f"🟢 Бот запущений та готовий до торгівлі {SYMBOL}")
-
-    # Ініціалізація сесії API
     global session, precision
 
+    log(empty_line=True)
+    log(f"⚪ Бот запущений та готовий до торгівлі {SYMBOL}")
+
+    # Ініціалізація сесії API
     try:
-        log("🔗 Підключення до біржі ", end="")
+        log("⛅ Підключення до біржі ", end="")
         session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
         log("виконано успішно", datetime_prefix=False)
     except Exception as e:
@@ -668,7 +670,7 @@ def main():
 
     # Отримання точності символу
     precision = get_symbol_precision(SYMBOL)
-    log(f"🤺 Точність символу {SYMBOL}: {precision} знаків після коми")
+    log(f"➗ Точність символу {SYMBOL}: {precision} знаків після коми")
 
     # Завантаження поточних позицій
     load_positions(precision, force_api=True)
@@ -681,7 +683,7 @@ def main():
 
     # Ініціалізація веб-сокета для отримання тікерів
     try:
-        log("🔄 Підписка на стрім тікерів ", end="")
+        log("⛅ Підписка на стрім тікерів ", end="")
         ws = WebSocket(testnet=False, channel_type="spot", api_key=API_KEY, api_secret=API_SECRET)
         ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
         log("виконано успішно", datetime_prefix=False)
@@ -696,7 +698,7 @@ def main():
     except KeyboardInterrupt:
         worker_stop_event.set()
         worker_thread.join()
-        log("🔴 Бот зупинено")
+        log("⚫ Бот зупинено")
 
 # Точка входу
 if __name__ == "__main__":
