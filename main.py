@@ -93,7 +93,7 @@ def load_instruments_info():
     message += f", котирувальна монета: {quote_coin} (точність: {quote_precision} знаків після коми)"
     log(message)
 
-def load_positions(force_api=False):
+def load_positions(force_api=True):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     """
@@ -327,7 +327,7 @@ def check_and_execute_sell(current_price):
                 if needed_qty <= 0:
                     log(f"❌ Потрібна кількість {base_coin} для продажу недостатня")
                     # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                    load_positions(force_api=True)
+                    load_positions()
                     break
 
                 log(f"⚽ Спроба продажу по {current_price}...")
@@ -376,7 +376,7 @@ def check_and_execute_sell(current_price):
                         log(f"✅ Ордер {order_data['orderId']} виконано")
 
                         # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                        load_positions(force_api=True)
+                        load_positions()
 
                         # Отримуємо реальну ціну виконання
                         exec_price = float(order_data.get('avgPrice', current_price))
@@ -564,7 +564,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 log(f"✅ Ордер {order_data['orderId']} виконано")
 
                 # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                load_positions(force_api=True)
+                load_positions()
 
                 # Отримуємо реальні дані виконання
                 pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
@@ -689,7 +689,7 @@ def main():
     load_instruments_info()
 
     # Завантаження поточних позицій
-    load_positions(force_api=True)
+    load_positions()
 
     # Запуск робочого потоку для обробки черги повідомлень з веб-сокета
     worker_stop_event = threading.Event()
