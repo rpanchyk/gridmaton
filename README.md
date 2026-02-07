@@ -54,8 +54,7 @@ Edit the `.env` file to set required settings:
 | `TELEGRAM_TOKEN`         | `-`       | Your Telegram bot token                              |
 | `TELEGRAM_CHAT_ID`       | `-`       | Your Telegram chat ID                                |
 | `DEMO_MODE`              | `True`    | Set to `False` to trade with real funds              |
-| `BASE_COIN`              | `BTC`     | Base coin symbol                                     |
-| `QUOTE_COIN`             | `USDT`    | Quote coin symbol                                    |
+| `SYMBOL`                 | `BTCUSDT` | Trading pair                                         |
 | `GRID_TYPE`              | `LINEAR`  | Grid type: `LINEAR` or `FIBO`                        |
 | `ORDER_SIZE`             | `10`      | Size of each buy order (quote coin amount)           |
 | `PROFIT_TARGET`          | `1000`    | Profit target per position (quote coin amount)       |

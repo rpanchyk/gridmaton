@@ -29,8 +29,7 @@ TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') # Токен бота Telegram
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор чату Telegram
 DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
-BASE_COIN = os.getenv('BASE_COIN', 'BTC') # Базова монета для торгівлі
-QUOTE_COIN = os.getenv('QUOTE_COIN', 'USDT') # Котирувальна монета для торгівлі
+SYMBOL = os.getenv('SYMBOL', 'BTCUSDT') # Торгова пара
 GRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
 ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
 PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
@@ -38,7 +37,6 @@ LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для
 LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
 
 # Статичні налаштування
-SYMBOL = f"{BASE_COIN}{QUOTE_COIN}"
 FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
@@ -54,31 +52,52 @@ if not API_KEY or not API_SECRET:
 data_queue = queue.Queue(maxsize=1000) # Черга для обробки даних
 active_positions_lock = threading.Lock() # Блокування для активних позицій
 session = None # Сесія API
-precision = 8 # Точність символу (кількість знаків після коми)
+base_coin = None # Базова монета для торгівлі
+quote_coin = None # Котирувальна монета для торгівлі
+base_precision = 8 # Точність символу (кількість знаків після коми)
+quote_precision = 2 # Точність котирувальної монети (кількість знаків після коми)
 active_positions = [] # Список активних позицій
 last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
 
-def get_symbol_precision(symbol):
+def load_instruments_info():
     """
-    Отримання точності символу.
-    :param symbol: Символ
-    :return: Точність символу
+    Отримання інформації про символ.
     """
-    global session
+    global session, base_coin, quote_coin, base_precision, quote_precision
 
-    info = session.get_instruments_info(category="spot", symbol=symbol)
-    if not info['result']['list']:
+    # Отримання інформації про символ
+    instrument_info = session.get_instruments_info(category="spot", symbol=SYMBOL)
+    if not instrument_info['result']['list']:
         raise ValueError("Невірний символ або відсутня інформація про нього.")
-    value = info['result']['list'][0]['lotSizeFilter']['basePrecision']
-    return len(value.split('.')[1]) if '.' in value else 0
 
-def load_positions(precision, force_api=False):
+    info = instrument_info['result']['list'][0]
+
+    # Базова монета
+    base_coin = info['baseCoin']
+
+    # Котирувальна монета
+    quote_coin = info['quoteCoin']
+
+    # Отримання точності базової монети
+    base_precision = info['lotSizeFilter']['basePrecision']
+    base_precision = len(base_precision.split('.')[1]) if '.' in base_precision else 0
+
+    # Отримання точності котирувальна монети
+    quote_precision = info['lotSizeFilter']['quotePrecision']
+    quote_precision = len(quote_precision.split('.')[1]) if '.' in quote_precision else 0
+
+    # Виведення інформації про символ
+    message = f"➗ Інструмент: {SYMBOL}"
+    message += f", базова монета: {base_coin} (точність: {base_precision} знаків після коми)"
+    message += f", котирувальна монета: {quote_coin} (точність: {quote_precision} знаків після коми)"
+    log(message)
+
+def load_positions(force_api=False):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
-    :param precision: Кількість знаків після коми для округлення кількості
     """
-    global active_positions_lock, session, active_positions
+    global active_positions_lock, session, base_precision, active_positions
 
     # Блокування для уникнення конфліктів при оновленні активних позицій
     with active_positions_lock:
@@ -123,7 +142,7 @@ def load_positions(precision, force_api=False):
                 restored = []
                 if balance_qty > 0:
                     for b in buys:
-                        fee = float(b['cumFeeDetail'][BASE_COIN]) if BASE_COIN in b['cumFeeDetail'] else 0
+                        fee = float(b['cumFeeDetail'][base_coin]) if base_coin in b['cumFeeDetail'] else 0
                         qty = float(b['cumExecQty']) - fee # Віднімаємо комісію в BTC
                         if balance_qty >= qty:
                             restored.append({
@@ -131,8 +150,8 @@ def load_positions(precision, force_api=False):
                                 "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                                 "side": "Buy",
                                 "price": b['avgPrice'],
-                                "qty": format(qty, f'.{precision+2}f'),
-                                "fee": format(fee, f'.{precision+2}f')
+                                "qty": format(qty, f'.{base_precision+2}f'),
+                                "fee": format(fee, f'.{base_precision+2}f')
                             })
                             balance_qty -= qty
                         else:
@@ -164,7 +183,7 @@ def get_wallet_balance(log_output=True):
 
     if log_output:
         log("⛳ Отримання балансу гаманця...")
-    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=BASE_COIN)
+    balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
 
@@ -173,9 +192,9 @@ def get_wallet_balance(log_output=True):
     total_equity = float(balance_info['result']['list'][0]['totalEquity'])
 
     if log_output:
-        message = f"⛳ Баланс: {format(balance_qty, f'.{precision+2}f')} {BASE_COIN}"
+        message = f"⛳ Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}"
         message += f" (${format(usd_value, '.2f')})"
-        message += f", загальна еквіті: {format(total_equity, '.2f')} {QUOTE_COIN}"
+        message += f", загальна еквіті: {format(total_equity, '.2f')} {quote_coin}"
         log(message)
 
     return balance_qty, usd_value, total_equity
@@ -223,7 +242,7 @@ def process_data(data):
     Обробка отриманих даних.
     :param data: Дані повідомлення
     """
-    global precision, active_positions, last_price
+    global active_positions, last_price
 
     try:
         # Отримуємо поточну ціну
@@ -276,7 +295,7 @@ def check_and_execute_sell(current_price):
     Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     """
-    global session, precision, active_positions, last_price
+    global session, base_precision, active_positions, last_price
 
     for pos in active_positions:
         sell_price = float(pos['price']) + PROFIT_TARGET
@@ -288,7 +307,7 @@ def check_and_execute_sell(current_price):
                 balance_qty, _, _ = get_wallet_balance()
 
                 # Округлюємо кількість ВНИЗ до потрібної точності
-                factor = 10 ** precision
+                factor = 10 ** base_precision
 
                 # Доступний баланс
                 balance_qty = math.floor(balance_qty * factor) / factor
@@ -296,21 +315,19 @@ def check_and_execute_sell(current_price):
                 # Потрібна кількість для продажу
                 needed_qty = float(pos['qty'])
                 needed_qty = math.floor(needed_qty * factor) / factor
-                log(f"✊ Потрібно продати: {format(needed_qty, f'.{precision+2}f'):} {BASE_COIN}")
+                log(f"✊ Потрібно продати: {format(needed_qty, f'.{base_precision+2}f'):} {base_coin}")
 
                 # Перевіряємо, чи вистачає балансу
                 if balance_qty < needed_qty:
-                    log(f"⚠️ Недостатньо балансу {BASE_COIN}: Треба {format(needed_qty, f'.{precision+2}f')}, є {format(balance_qty, f'.{precision+2}f')}")
+                    log(f"⚠️ Недостатньо балансу {base_coin}: Треба {format(needed_qty, f'.{base_precision+2}f')}, є {format(balance_qty, f'.{base_precision+2}f')}")
                     # Тут можна або пропустити, або спробувати продати те, що є:
                     # continue
                     needed_qty = balance_qty
 
                 if needed_qty <= 0:
-                    log(f"❌ Потрібна кількість {BASE_COIN} для продажу недостатня")
-
+                    log(f"❌ Потрібна кількість {base_coin} для продажу недостатня")
                     # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                    load_positions(precision, force_api=True)
-
+                    load_positions(force_api=True)
                     break
 
                 log(f"⚽ Спроба продажу по {current_price}...")
@@ -319,7 +336,7 @@ def check_and_execute_sell(current_price):
                     symbol=SYMBOL,
                     side="Sell",
                     orderType="Market",
-                    qty=format(needed_qty, f'.{precision}f')
+                    qty=format(needed_qty, f'.{base_precision}f')
                 )
                 if order.get('retCode') != 0:
                     log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -359,7 +376,7 @@ def check_and_execute_sell(current_price):
                         log(f"✅ Ордер {order_data['orderId']} виконано")
 
                         # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                        load_positions(precision, force_api=True)
+                        load_positions(force_api=True)
 
                         # Отримуємо реальну ціну виконання
                         exec_price = float(order_data.get('avgPrice', current_price))
@@ -370,9 +387,9 @@ def check_and_execute_sell(current_price):
                         exec_time = datetime.fromtimestamp(int(exec_time)/1000) if exec_time else datetime.now()
                         timedelta = exec_time - datetime.strptime(pos['date'], '%Y-%m-%d %H:%M:%S')
 
-                        message = f"⚽ Продано {pos['qty']} {BASE_COIN} по ціні {exec_price} {QUOTE_COIN}"
-                        message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {QUOTE_COIN}"
-                        message += f", прибуток {format(profit, '.2f')} {QUOTE_COIN}."
+                        message = f"⚽ Продано {pos['qty']} {base_coin} по ціні {exec_price} {quote_coin}"
+                        message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {quote_coin}"
+                        message += f", прибуток {format(profit, '.2f')} {quote_coin}."
                         message += f" Ордер був розміщений {pos['date']} та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
                         message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}."
                         log(message)
@@ -487,7 +504,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     :param lower_buy_level: Нижній рівень купівлі
     :param upper_buy_level: Верхній рівень купівлі
     """
-    global session, precision, active_positions, last_price
+    global session, base_precision, active_positions, last_price
 
     # Визначення рівня купівлі, який було перетнуто
     level = None
@@ -547,7 +564,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 log(f"✅ Ордер {order_data['orderId']} виконано")
 
                 # Оновлюємо позиції з API, щоб уникнути розбіжностей
-                load_positions(precision, force_api=True)
+                load_positions(force_api=True)
 
                 # Отримуємо реальні дані виконання
                 pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
@@ -559,9 +576,9 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 exec_qty = float(pos['qty'])
                 commission = float(pos['fee'])
 
-                message = f"⛺ Куплено {exec_qty} {BASE_COIN} по ціні {format(exec_price, '.2f')} {QUOTE_COIN}"
-                message += f", що становить {format(exec_qty * exec_price, '.2f')} {QUOTE_COIN}"
-                message += f" включно з комісією {format(commission * exec_price, '.2f')} {QUOTE_COIN}."
+                message = f"⛺ Куплено {exec_qty} {base_coin} по ціні {format(exec_price, '.2f')} {quote_coin}"
+                message += f", що становить {format(exec_qty * exec_price, '.2f')} {quote_coin}"
+                message += f" включно з комісією {format(commission * exec_price, '.2f')} {quote_coin}."
                 log(message)
 
                 # Записуємо в лог-файл
@@ -654,7 +671,7 @@ def main():
     Головна функція для запуску бота.
     Вона ініціалізує з'єднання та підписується на стрім тікерів.
     """
-    global session, precision
+    global session
 
     log(empty_line=True)
     log(f"⚪ Бот запущений та готовий до торгівлі {SYMBOL}")
@@ -669,11 +686,10 @@ def main():
         return
 
     # Отримання точності символу
-    precision = get_symbol_precision(SYMBOL)
-    log(f"➗ Точність символу {SYMBOL}: {precision} знаків після коми")
+    load_instruments_info()
 
     # Завантаження поточних позицій
-    load_positions(precision, force_api=True)
+    load_positions(force_api=True)
 
     # Запуск робочого потоку для обробки черги повідомлень з веб-сокета
     worker_stop_event = threading.Event()
