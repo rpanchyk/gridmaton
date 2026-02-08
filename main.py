@@ -517,11 +517,14 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
         return # Рівень купівлі не перетнуто
 
     # Перевірка, чи є активна позиція на цьому рівні
+    log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
     for p in active_positions:
         p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        log(f"❔ Перевірка позиції з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level}")
         if math.isclose(level, p_level):
             log(f"⚠️ Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита {p['date']}")
             return
+    log(f"✋ Позицій на рівні {level} не знайдено")
 
     try:
         log(f"⚽ Спроба купівлі на рівні {level}...")
