@@ -332,7 +332,7 @@ def check_and_execute_sell(current_price):
 
                 if needed_qty <= 0:
                     log(f"❌ Потрібна кількість {base_coin} для продажу недостатня")
-                    # Оновлюємо позиції з API, щоб уникнути розбіжностей
+                    # Оновлюємо позиції, щоб уникнути розбіжностей
                     load_positions()
                     break
 
@@ -381,7 +381,7 @@ def check_and_execute_sell(current_price):
                     if status == "Filled":
                         log(f"✅ Ордер {order_data['orderId']} виконано")
 
-                        # Оновлюємо позиції з API, щоб уникнути розбіжностей
+                        # Оновлюємо позиції, щоб уникнути розбіжностей
                         load_positions()
 
                         # Отримуємо реальну ціну виконання
@@ -571,7 +571,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             if status == "Filled":
                 log(f"✅ Ордер {order_data['orderId']} виконано")
 
-                # Оновлюємо позиції з API, щоб уникнути розбіжностей
+                # Оновлюємо позиції, щоб уникнути розбіжностей
                 load_positions()
 
                 # Отримуємо реальні дані виконання
