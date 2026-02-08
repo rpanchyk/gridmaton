@@ -255,7 +255,7 @@ def process_data(data):
             return # Ігноруємо перше повідомлення, яке встановлює базову ціну
 
         # Перевірка на зміну ціни
-        if current_price == last_price:
+        if math.isclose(current_price, last_price):
             return # Ігноруємо, якщо ціна не змінилася
 
         # Перевірка на виконання продажу відповідно до поточної ціни
@@ -391,13 +391,15 @@ def check_and_execute_sell(current_price):
                         exec_time = datetime.fromtimestamp(int(exec_time)/1000) if exec_time else datetime.now()
                         timedelta = exec_time - datetime.strptime(pos['date'], '%Y-%m-%d %H:%M:%S')
 
-                        message = f"⚽ Продано {pos['qty']} {base_coin} по ціні {exec_price} {quote_coin}"
-                        message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {quote_coin}"
-                        message += f", прибуток {format(profit, '.2f')} {quote_coin}."
-                        message += f" Ордер на продаж: {order_data['orderId']}."
-                        message += f" Ордер на покупку {pos['order_id']} був розміщений {pos['date']} та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
-                        message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}"
-                        message += f" по ціні {pos['price']} {quote_coin}."
+                        message = f"⚽ Продано {pos['qty']} {base_coin} по ціні {exec_price} {quote_coin},"
+                        message += f" що становить {format(float(pos['qty']) * exec_price, '.2f')} {quote_coin},"
+                        message += f" приблизний прибуток {format(profit, '.2f')} {quote_coin}."
+                        message += f" Ордер на продаж {order_data['orderId']} виконано,"
+                        message += f" ціна досягала {format(current_price, '.2f')} {quote_coin}."
+                        message += f" Ордер на покупку {pos['order_id']} був розміщений {pos['date']}"
+                        message += f" по ціні {pos['price']} {quote_coin}"
+                        message += f" та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
+                        message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}."
                         log(message)
 
                         # Записуємо в лог-файл
