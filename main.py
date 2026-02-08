@@ -593,7 +593,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 message = f"⛺ Куплено {exec_qty} {base_coin} по ціні {format(exec_price, '.2f')} {quote_coin}"
                 message += f", що становить {format(exec_qty * exec_price, '.2f')} {quote_coin}"
                 message += f" включно з комісією {format(commission * exec_price, '.2f')} {quote_coin}."
-                message += f" Ордер на покупку: {order_data['orderId']}."
+                message += f" Ордер на покупку {pos['order_id']} було розміщено {pos['date']}."
                 log(message)
 
                 # Записуємо в лог-файл
