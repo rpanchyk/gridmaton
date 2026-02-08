@@ -685,7 +685,6 @@ def main():
     """
     global session
 
-    log(empty_line=True)
     log(f"⚪ Бот запущений та готовий до роботи")
 
     # Ініціалізація сесії API
@@ -727,6 +726,7 @@ def main():
         worker_stop_event.set()
         worker_thread.join()
         log("⚫ Бот зупинено")
+        log(empty_line=True)
 
 # Точка входу
 if __name__ == "__main__":
