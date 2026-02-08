@@ -283,8 +283,6 @@ def process_data(data):
         # Періодично логуєм в файл
         interval_seconds = 60 * TICKER_LOG_INTERVAL_MINS
         current_time = (datetime.now().timestamp() // interval_seconds) * interval_seconds
-        if ticker_log_time == 0:
-            ticker_log_time = current_time
         if ticker_log_time != current_time and current_time % interval_seconds == 0:
             log(message, console_output=False)
             ticker_log_time = current_time
@@ -680,7 +678,7 @@ def main():
     global session
 
     log(empty_line=True)
-    log(f"⚪ Бот запущений та готовий до торгівлі {SYMBOL}")
+    log(f"⚪ Бот запущений та готовий до роботи")
 
     # Ініціалізація сесії API
     try:
