@@ -59,6 +59,7 @@ quote_precision = 2 # Точність котирувальної монети (
 active_positions = [] # Список активних позицій
 last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
+ticker_file_log_time = 0 # Останній час логування потоку тікерів
 
 def load_instruments_info():
     """
@@ -241,7 +242,7 @@ def process_data(data):
     Обробка отриманих даних.
     :param data: Дані повідомлення
     """
-    global last_price
+    global last_price, ticker_file_log_time
 
     try:
         # Отримуємо поточну ціну
@@ -279,8 +280,10 @@ def process_data(data):
         log(message, file_output=False)
 
         # Періодично логуєм в файл
-        if int(datetime.now().timestamp()) % 60 == 0:
+        current_time = (datetime.now().timestamp() // 60) * 60
+        if ticker_file_log_time != current_time and current_time % 60 == 0:
             log(message, console_output=False)
+            ticker_file_log_time = current_time
 
         # Оновлення останньої ціни
         last_price = current_price

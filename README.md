@@ -101,6 +101,14 @@ Active trading positions are saved in `positions.json`:
 cat positions.json
 ```
 
+### View Operational Log
+
+Check the `work.log` file for detailed operational information:
+
+```shell
+cat work.log
+```
+
 ### View Trade History
 
 Check the `trade.log` file for detailed trading history:
