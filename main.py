@@ -300,7 +300,7 @@ def check_and_execute_sell(current_price):
         sell_price = float(pos['price']) + PROFIT_TARGET
         if current_price >= sell_price:
             try:
-                log(f"⚾ Ціна {current_price:.2f} досягла рівня продажу {sell_price:.2f} для позиції купівлі по {pos['price']}")
+                log(f"⚾ Ціна {current_price:.2f} досягла рівня продажу {sell_price:.2f} для позиції купівлі по {pos['price']} для ордеру {pos['order_id']}")
 
                 # Отримання балансу гаманця
                 balance_qty, _, _ = get_wallet_balance()
@@ -389,8 +389,10 @@ def check_and_execute_sell(current_price):
                         message = f"⚽ Продано {pos['qty']} {base_coin} по ціні {exec_price} {quote_coin}"
                         message += f", що становить {format(float(pos['qty']) * exec_price, '.2f')} {quote_coin}"
                         message += f", прибуток {format(profit, '.2f')} {quote_coin}."
-                        message += f" Ордер був розміщений {pos['date']} та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
-                        message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}."
+                        message += f" Ордер на продаж: {order_data['orderId']}."
+                        message += f" Ордер на покупку {pos['order_id']} був розміщений {pos['date']} та тривав до {exec_time.strftime('%Y-%m-%d %H:%M:%S')},"
+                        message += f" загальний час утримання позиції склав {format_timedelta(timedelta)}"
+                        message += f" по ціні {pos['price']} {quote_coin}."
                         log(message)
 
                         # Записуємо в лог-файл
@@ -578,6 +580,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 message = f"⛺ Куплено {exec_qty} {base_coin} по ціні {format(exec_price, '.2f')} {quote_coin}"
                 message += f", що становить {format(exec_qty * exec_price, '.2f')} {quote_coin}"
                 message += f" включно з комісією {format(commission * exec_price, '.2f')} {quote_coin}."
+                message += f" Ордер на покупку: {order_data['orderId']}."
                 log(message)
 
                 # Записуємо в лог-файл
