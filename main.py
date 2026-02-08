@@ -29,7 +29,7 @@ TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') # Токен бота Telegram
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор чату Telegram
 DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
-SYMBOL = os.getenv('SYMBOL', 'BTCUSDT') # Торгова пара
+SYMBOL = os.getenv('SYMBOL', 'BTCUSDT').upper() # Торгова пара
 GRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
 ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
 PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
@@ -43,6 +43,7 @@ TRADE_LOG_FILE = "trade.log"
 WORK_LOG_FILE = "work.log"
 RETRY_NUMBER = 5
 RETRY_DELAY = 2
+TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
 
 # Перевірка наявності ключів API
 if not API_KEY or not API_SECRET:
@@ -59,7 +60,7 @@ quote_precision = 2 # Точність котирувальної монети (
 active_positions = [] # Список активних позицій
 last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
-ticker_file_log_time = 0 # Останній час логування потоку тікерів
+ticker_log_time = 0 # Останній час логування потоку тікерів
 
 def load_instruments_info():
     """
@@ -242,7 +243,7 @@ def process_data(data):
     Обробка отриманих даних.
     :param data: Дані повідомлення
     """
-    global last_price, ticker_file_log_time
+    global last_price, ticker_log_time
 
     try:
         # Отримуємо поточну ціну
@@ -280,10 +281,13 @@ def process_data(data):
         log(message, file_output=False)
 
         # Періодично логуєм в файл
-        current_time = (datetime.now().timestamp() // 60) * 60
-        if ticker_file_log_time != current_time and current_time % 60 == 0:
+        interval_seconds = 60 * TICKER_LOG_INTERVAL_MINS
+        current_time = (datetime.now().timestamp() // interval_seconds) * interval_seconds
+        if ticker_log_time == 0:
+            ticker_log_time = current_time
+        if ticker_log_time != current_time and current_time % interval_seconds == 0:
             log(message, console_output=False)
-            ticker_file_log_time = current_time
+            ticker_log_time = current_time
 
         # Оновлення останньої ціни
         last_price = current_price
