@@ -516,8 +516,13 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     else:
         return # Рівень купівлі не перетнуто
 
+    # Вивід активних позицій
+    if active_positions:
+        log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
+    else:
+        log("✨ Активних позицій немає")
+
     # Перевірка, чи є активна позиція на цьому рівні
-    log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
     for p in active_positions:
         p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
         log(f"❔ Перевірка позиції з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level}")
