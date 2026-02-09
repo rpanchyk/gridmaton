@@ -200,18 +200,19 @@ def get_wallet_balance(log_output=True):
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
+    # log(f"⛳ Інформацію про баланс отримано: {json.dumps(balance_info, indent=4)}")
 
     balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
+    equity_qty = float(balance_info['result']['list'][0]['coin'][0]['equity'])
     usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
-    total_equity = float(balance_info['result']['list'][0]['totalEquity'])
 
     if log_output:
         message = f"⛳ Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}"
         message += f" (${format(usd_value, '.2f')})"
-        message += f", загальна еквіті: {format(total_equity, '.2f')} {quote_coin}"
+        message += f", еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}"
         log(message)
 
-    return balance_qty, usd_value, total_equity
+    return balance_qty, equity_qty, usd_value
 
 def handle_message(message):
     """
@@ -694,10 +695,10 @@ def log_stats(log_output=False, telegram_output=True):
     message = ""
 
     # Статистика рахунку
-    balance_qty, usd_value, total_equity = get_wallet_balance(log_output=False)
+    balance_qty, equity_qty, usd_value = get_wallet_balance(log_output=False)
     message += "⛳ Статистика рахунку:\n"
-    message += f"Загальна еквіті: {format(total_equity, '.2f')} {quote_coin}\n"
     message += f"Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin} (${format(usd_value, '.2f')})\n"
+    message += f"Еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}\n"
     message += "\n"
 
     # Активні позиції
