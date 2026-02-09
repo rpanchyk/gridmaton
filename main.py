@@ -98,7 +98,7 @@ def load_instruments_info():
     message += f", котирувальна монета: {quote_coin} (точність: {quote_precision} знаків після коми)"
     log(message)
 
-def load_positions(force_api=True, balance_correction_qty=0):
+def load_positions(force_api=True):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     """
@@ -144,10 +144,6 @@ def load_positions(force_api=True, balance_correction_qty=0):
 
                 # Отримання балансу гаманця
                 balance_qty, _, _ = get_wallet_balance()
-
-                # Віднімаємо від балансу корекцію
-                if balance_correction_qty > 0:
-                    balance_qty -= balance_correction_qty
 
                 # Відновлення позицій з історії ордерів
                 restored = []
@@ -608,11 +604,8 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 log(f"✅ Ордер на покупку {order_data['orderId']} виконано")
                 log(f"➡️ Поки ордер на покупку {order_id} не буде підтверджено, серед активних позицій може показуватись невірна інформація")
 
-                balance_correction_qty=float(order_data['cumExecQty'])
-                log(f"➡️ Прибираємо {balance_correction_qty} {base_coin} з балансу як корекцію до моменту підтвердження ордеру")
-
                 # Оновлюємо позиції, щоб уникнути розбіжностей
-                load_positions(balance_correction_qty=balance_correction_qty)
+                load_positions()
 
                 # Отримуємо реальні дані виконання
                 pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
