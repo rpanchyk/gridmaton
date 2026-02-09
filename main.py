@@ -37,7 +37,6 @@ LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для
 LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
 
 # Статичні налаштування
-ORDER_MARKER = "gridmaton"
 FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 STATS_LOG_FILE = "stats.log"
@@ -128,8 +127,7 @@ def load_positions(force_api=True, balance_correction_qty=0):
                     symbol=SYMBOL,
                     limit=50,
                     status="Filled",
-                    execType="Trade",
-                    orderLinkId=ORDER_MARKER
+                    execType="Trade"
                 )
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
@@ -154,21 +152,28 @@ def load_positions(force_api=True, balance_correction_qty=0):
                 # Відновлення позицій з історії ордерів
                 restored = []
                 if balance_qty > 0:
+                    log("➰ Формування позицій з історії ордерів розпочато")
+                    log(f"➰ Початковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}", end="")
+                    log(f" ({format(balance_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
                     for b in buys:
+                        qty = float(b['cumExecQty'])
                         fee = float(b['cumFeeDetail'][base_coin]) if base_coin in b['cumFeeDetail'] else 0
-                        qty = float(b['cumExecQty']) - fee # Віднімаємо комісію в BTC
-                        if balance_qty >= qty:
+                        if balance_qty >= qty and qty * last_price >= ORDER_SIZE:
                             restored.append({
                                 "order_id": b['orderId'],
                                 "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
                                 "side": "Buy",
                                 "price": b['avgPrice'],
-                                "qty": format(qty, f'.{base_precision+2}f'),
+                                "qty": format(qty - fee, f'.{base_precision+2}f'), # Віднімаємо комісію
                                 "fee": format(fee, f'.{base_precision+2}f')
                             })
+                            log(f"➰ Ордер {b['orderId']} додано в список позицій з історії ордерів")
+
                             balance_qty -= qty
+                            log(f"➰ Залишковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}", end="")
+                            log(f" ({format(balance_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
                         else:
-                            log(f"➰ Залишковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}")
+                            log("➰ Формування позицій з історії ордерів завершено")
                             break
 
                 # Сортуємо за ціною (від більшої до меншої)
@@ -363,9 +368,7 @@ def check_and_execute_sell(current_price):
                     symbol=SYMBOL,
                     side="Sell",
                     orderType="Market",
-                    qty=format(needed_qty, f'.{base_precision}f'),
-                    orderLinkId=ORDER_MARKER,
-                    isLeverage=0
+                    qty=format(needed_qty, f'.{base_precision}f')
                 )
                 if order.get('retCode') != 0:
                     log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -565,9 +568,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             symbol=SYMBOL,
             side="Buy",
             orderType="Market",
-            qty=str(ORDER_SIZE), # Вказується в котирувальній монеті
-            orderLinkId=ORDER_MARKER,
-            isLeverage=0
+            qty=str(ORDER_SIZE) # Вказується в котирувальній монеті
         )
         if order.get('retCode') != 0:
             log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -748,7 +749,7 @@ def main():
     Головна функція для запуску бота.
     Вона ініціалізує з'єднання та підписується на стрім тікерів.
     """
-    global session
+    global session, last_price
 
     log(f"⚪ Бот запущений та готовий до роботи")
 
@@ -763,6 +764,9 @@ def main():
 
     # Отримання точності символу
     load_instruments_info()
+
+    # Отримання останньої ціни
+    last_price = float(session.get_tickers(category="spot", symbol=SYMBOL)['result']['list'][0]['lastPrice'])
 
     # Завантаження поточних позицій
     load_positions()
