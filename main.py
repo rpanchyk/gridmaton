@@ -40,11 +40,13 @@ LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рів
 ORDER_MARKER = "gridmaton"
 FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
+STATS_LOG_FILE = "stats.log"
 TRADE_LOG_FILE = "trade.log"
 WORK_LOG_FILE = "work.log"
 RETRY_NUMBER = 5
 RETRY_DELAY = 3
 TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
+STATS_LOG_INTERVAL_MINS = 60 * 24 # Інтервал логування статистики
 
 # Перевірка наявності ключів API
 if not API_KEY or not API_SECRET:
@@ -62,6 +64,7 @@ active_positions = [] # Список активних позицій
 last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
 ticker_log_time = 0 # Останній час логування потоку тікерів
+stats_log_time = 0 # Останній час логування статистики
 
 def load_instruments_info():
     """
@@ -181,7 +184,7 @@ def load_positions(force_api=True, balance_correction_qty=0):
                 log(f"❌ Помилка відновлення: {e}")
 
         if active_positions:
-            log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
+            log(f"✨ Активні позиції ({len(active_positions)} шт): {active_positions}")
         else:
             log("⚠️ Позицій для відновлення не знайдено")
 
@@ -250,7 +253,7 @@ def process_data(data):
     Обробка отриманих даних.
     :param data: Дані повідомлення
     """
-    global last_price, ticker_log_time
+    global last_price, ticker_log_time, stats_log_time
 
     try:
         # Отримуємо поточну ціну
@@ -287,12 +290,25 @@ def process_data(data):
         message += f" | Наст.продаж: {f"{next_sell_price:.2f}" if next_sell_price else "немає"}"
         log(message, file_output=False)
 
-        # Періодично логуєм в файл
-        interval_seconds = 60 * TICKER_LOG_INTERVAL_MINS
-        current_time = (datetime.now().timestamp() // interval_seconds) * interval_seconds
-        if ticker_log_time != current_time and current_time % interval_seconds == 0:
+        # Періодично логуєм дані тікера в файл
+        ticker_interval_seconds = 60 * TICKER_LOG_INTERVAL_MINS
+        current_time = (datetime.now().timestamp() // ticker_interval_seconds) * ticker_interval_seconds
+        if ticker_log_time != current_time and current_time % ticker_interval_seconds == 0:
             log(message, console_output=False)
             ticker_log_time = current_time
+
+        # Логування статистики
+        stats_interval_seconds = 60 * STATS_LOG_INTERVAL_MINS
+        current_time = int((datetime.now().timestamp() // stats_interval_seconds) * stats_interval_seconds)
+        stats_log_time = 0
+        if os.path.exists(STATS_LOG_FILE):
+            with open(STATS_LOG_FILE, "r") as f:
+                value = f.readline().strip()
+                stats_log_time = int(value) if value.isdigit() else 0
+        if stats_log_time != current_time and current_time % stats_interval_seconds == 0:
+            log_stats()
+            with open(STATS_LOG_FILE, "w") as f:
+                f.write(str(current_time))
 
         # Оновлення останньої ціни
         last_price = current_price
@@ -529,7 +545,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
 
     # Вивід активних позицій
     if active_positions:
-        log(f"✨ Активні позиції ({len(active_positions)} шт.): {active_positions}")
+        log(f"✨ Активні позиції ({len(active_positions)} шт): {active_positions}")
     else:
         log("✨ Активних позицій немає")
 
@@ -676,6 +692,37 @@ def log_trade(pos, action, exec_price, profit=None):
     # Запис у файл
     with open(TRADE_LOG_FILE, "a", encoding="utf-8") as f:
         f.write(message + "\n")
+
+def log_stats(log_output=False, telegram_output=True):
+    """
+    Логування статистики.
+    """
+    message = ""
+
+    # Статистика рахунку
+    balance_qty, usd_value, total_equity = get_wallet_balance(log_output=False)
+    message += "⛳ Статистика рахунку:\n"
+    message += f"Загальна еквіті: {format(total_equity, '.2f')} {quote_coin}\n"
+    message += f"Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin} (${format(usd_value, '.2f')})\n"
+    message += "\n"
+
+    # Активні позиції
+    if active_positions:
+        message += f"✨ Активні позиції ({len(active_positions)} шт):"
+        for pos in active_positions:
+            message += "\n"
+            message += f"- {pos['price']} ({format(float(pos['qty']), f'.{base_precision}f')} {base_coin}"
+            message += f" / {format(float(pos['qty']) * float(pos['price']) - 0.4, '.1f')} {quote_coin})"
+    else:
+        message += "✨ Активних позицій немає."
+
+    # Логування
+    if log_output:
+        log(message)
+
+    # Оповіщення в Telegram
+    if telegram_output:
+        send_telegram(message)
 
 def send_telegram(message):
     """

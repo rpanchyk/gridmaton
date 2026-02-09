@@ -1,4 +1,5 @@
 .env
 positions.json
+stats.log
 trade.log
 work.log
