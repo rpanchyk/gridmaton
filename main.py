@@ -42,8 +42,8 @@ POSITIONS_FILE = "positions.json"
 STATS_LOG_FILE = "stats.log"
 TRADE_LOG_FILE = "trade.log"
 WORK_LOG_FILE = "work.log"
-RETRY_NUMBER = 5
-RETRY_DELAY = 3
+RETRY_COUNT = 10 # Кількість спроб
+RETRY_DELAY_SECONDS = 3 # Затримка між спробами (у секундах)
 TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
 STATS_LOG_INTERVAL_MINS = 60 * 24 # Інтервал логування статистики
 
@@ -379,8 +379,8 @@ def check_and_execute_sell(current_price):
                 is_filled = False
 
                 # Перевірка статусу
-                for _ in range(RETRY_NUMBER):
-                    time.sleep(RETRY_DELAY) # Затримка перед перевіркою
+                for _ in range(RETRY_COUNT):
+                    time.sleep(RETRY_DELAY_SECONDS) # Затримка перед перевіркою
 
                     log(f"⛽ Отримання історії ордерів для ордеру на продаж {order_id} ...")
                     history = session.get_order_history(
@@ -579,8 +579,8 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
         is_filled = False
 
         # Перевірка статусу
-        for i in range(RETRY_NUMBER):
-            time.sleep(RETRY_DELAY) # Затримка перед перевіркою
+        for i in range(RETRY_COUNT):
+            time.sleep(RETRY_DELAY_SECONDS) # Затримка перед перевіркою
 
             log(f"⛽ Отримання історії ордерів для ордеру на покупку {order_id} ...")
             history = session.get_order_history(
@@ -589,14 +589,14 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 orderId=order_id
             )
             if history.get('retCode') != 0:
-                log(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')} (спроба {i+1} з {RETRY_NUMBER})")
+                log(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')} (спроба {i+1} з {RETRY_COUNT})")
                 continue
             # log(f"Історія ордерів: {history}")
 
             # Отримуємо інформацію про ордер з історії
             trades = history['result']['list']
             if not trades:
-                log(f"⚠️ Ордер на покупку {order_id} не знайдено в історії ордерів (спроба {i+1} з {RETRY_NUMBER})")
+                log(f"⚠️ Ордер на покупку {order_id} не знайдено в історії ордерів (спроба {i+1} з {RETRY_COUNT})")
                 continue
 
             order_data = trades[0]
@@ -617,7 +617,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 # Отримуємо реальні дані виконання
                 pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
                 if not pos:
-                    log(f"❌ Виконаний ордер на покупку {order_data['orderId']} не знайдено серед активних позицій (спроба {i+1} з {RETRY_NUMBER})")
+                    log(f"❌ Виконаний ордер на покупку {order_data['orderId']} не знайдено серед активних позицій (спроба {i+1} з {RETRY_COUNT})")
                     continue
                 log(f"➡️ Виконаний ордер на покупку {order_data['orderId']} знайдено серед активних позицій")
 
@@ -643,7 +643,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 log(f"❎ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
                 break
             else:
-                log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status} (спроба {i+1} з {RETRY_NUMBER})")
+                log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status} (спроба {i+1} з {RETRY_COUNT})")
                 continue
 
         if not is_filled:
