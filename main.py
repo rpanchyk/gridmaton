@@ -446,7 +446,7 @@ def check_and_execute_sell(current_price):
                         continue
 
                 if not is_filled:
-                    log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
+                    log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не підтверджено")
 
             except Exception as e:
                 log(f"❌ КРИТИЧНА ПОМИЛКА при продажі: {e}")
@@ -647,7 +647,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 continue
 
         if not is_filled:
-            log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не отримано.")
+            log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не підтверджено")
 
     except Exception as e:
         log(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
