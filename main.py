@@ -12,7 +12,7 @@ from enum import Enum
 from pybit.unified_trading import HTTP, WebSocket
 
 # Сумісні іконки для консолі:
-# ☔☕♈♉♊♋♌♍♎♏♐♑♒♓⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⚙️⚠️
+# ☔☕♈♉♊♋♌♍♎♏♐♑♒♓⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⚙️⚠️ℹ️➡️
 
 # Перелік типів сітки
 class GridType(Enum):
@@ -42,7 +42,7 @@ POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
 WORK_LOG_FILE = "work.log"
 RETRY_NUMBER = 5
-RETRY_DELAY = 2
+RETRY_DELAY = 3
 TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
 
 # Перевірка наявності ключів API
@@ -95,7 +95,7 @@ def load_instruments_info():
     message += f", котирувальна монета: {quote_coin} (точність: {quote_precision} знаків після коми)"
     log(message)
 
-def load_positions(force_api=True):
+def load_positions(force_api=True, balance_correction_qty=0):
     """
     Завантажує активні позиції з файлу або відновлює їх з API, якщо файл відсутній або порожній.
     """
@@ -140,7 +140,11 @@ def load_positions(force_api=True):
                 #     json.dump(buys, f, indent=4)
 
                 # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance(log_output=False)
+                balance_qty, _, _ = get_wallet_balance()
+
+                # Віднімаємо від балансу корекцію
+                if balance_correction_qty > 0:
+                    balance_qty -= balance_correction_qty
 
                 # Відновлення позицій з історії ордерів
                 restored = []
@@ -159,6 +163,7 @@ def load_positions(force_api=True):
                             })
                             balance_qty -= qty
                         else:
+                            log(f"➰ Залишковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}")
                             break
 
                 # Сортуємо за ціною (від більшої до меншої)
@@ -347,14 +352,14 @@ def check_and_execute_sell(current_price):
                     continue
 
                 order_id = order['result']['orderId']
-                log(f"⛵ Ордер {order_id} розміщено. Очікування виконання...")
+                log(f"⛵ Ордер на продаж {order_id} розміщено. Очікування виконання...")
                 is_filled = False
 
                 # Перевірка статусу
                 for _ in range(RETRY_NUMBER):
                     time.sleep(RETRY_DELAY) # Затримка перед перевіркою
 
-                    log("⛽ Отримання історії ордерів...")
+                    log(f"⛽ Отримання історії ордерів для ордеру на продаж {order_id} ...")
                     history = session.get_order_history(
                         category="spot",
                         symbol=SYMBOL,
@@ -368,16 +373,16 @@ def check_and_execute_sell(current_price):
                     # Отримуємо інформацію про ордер з історії
                     trades = history['result']['list']
                     if not trades:
-                        log(f"⚠️ Ордер {order_id} не знайдено в історії ордерів")
+                        log(f"⚠️ Ордер на продаж {order_id} не знайдено в історії ордерів")
                         continue
 
                     order_data = trades[0]
-                    log(f"⛽ Ордер {order_data['orderId']} отримано з історії")
+                    log(f"⛽ Ордер на продаж {order_data['orderId']} отримано з історії: {order_data}")
 
                     # Перевіряємо статус ордера
                     status = order_data['orderStatus']
                     if status == "Filled":
-                        log(f"✅ Ордер {order_data['orderId']} виконано")
+                        log(f"✅ Ордер на продаж {order_data['orderId']} виконано")
 
                         # Оновлюємо позиції, щоб уникнути розбіжностей
                         load_positions()
@@ -547,59 +552,64 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             return
 
         order_id = order['result']['orderId']
-        log(f"⛵ Ордер {order_id} розміщено. Очікування виконання...")
+        log(f"⛵ Ордер на покупку {order_id} розміщено. Очікування виконання...")
         is_filled = False
 
         # Перевірка статусу
-        for _ in range(RETRY_NUMBER):
+        for i in range(RETRY_NUMBER):
             time.sleep(RETRY_DELAY) # Затримка перед перевіркою
 
-            log("⛽ Отримання історії ордерів...")
+            log(f"⛽ Отримання історії ордерів для ордеру на покупку {order_id} ...")
             history = session.get_order_history(
                 category="spot",
                 symbol=SYMBOL,
                 orderId=order_id
             )
             if history.get('retCode') != 0:
-                log(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
+                log(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')} (спроба {i+1} з {RETRY_NUMBER})")
                 continue
             # log(f"Історія ордерів: {history}")
 
             # Отримуємо інформацію про ордер з історії
             trades = history['result']['list']
             if not trades:
-                log(f"⚠️ Ордер {order_id} не знайдено в історії ордерів")
+                log(f"⚠️ Ордер на покупку {order_id} не знайдено в історії ордерів (спроба {i+1} з {RETRY_NUMBER})")
                 continue
 
             order_data = trades[0]
-            log(f"⛽ Ордер {order_data['orderId']} отримано з історії")
+            log(f"⛽ Ордер на покупку {order_data['orderId']} отримано з історії: {order_data}")
 
             # Перевіряємо статус ордера
             status = order_data['orderStatus']
             if status == "Filled":
-                log(f"✅ Ордер {order_data['orderId']} виконано")
+                log(f"✅ Ордер на покупку {order_data['orderId']} виконано")
+                log(f"➡️ Поки ордер на покупку {order_id} не буде підтверджено, серед активних позицій може показуватись невірна інформація")
+
+                balance_correction_qty=float(order_data['cumExecQty'])
+                log(f"➡️ Прибираємо {balance_correction_qty} {base_coin} з балансу як корекцію до моменту підтвердження ордеру")
 
                 # Оновлюємо позиції, щоб уникнути розбіжностей
-                load_positions()
+                load_positions(balance_correction_qty=balance_correction_qty)
 
                 # Отримуємо реальні дані виконання
                 pos = next((p for p in active_positions if p['order_id'] == order_data['orderId']), None)
                 if not pos:
-                    log(f"❌ Виконаний ордер {order_data['orderId']} не знайдено серед активних позицій")
+                    log(f"❌ Виконаний ордер на покупку {order_data['orderId']} не знайдено серед активних позицій (спроба {i+1} з {RETRY_NUMBER})")
                     continue
+                log(f"➡️ Виконаний ордер на покупку {order_data['orderId']} знайдено серед активних позицій")
 
-                exec_price = float(pos['price'])
-                exec_qty = float(pos['qty'])
-                commission = float(pos['fee'])
+                price = float(pos['price'])
+                qty = float(pos['qty'])
+                fee = float(pos['fee'])
 
-                message = f"⛺ Куплено {exec_qty} {base_coin} по ціні {format(exec_price, '.2f')} {quote_coin}"
-                message += f", що становить {format(exec_qty * exec_price, '.2f')} {quote_coin}"
-                message += f" включно з комісією {format(commission * exec_price, '.2f')} {quote_coin}."
+                message = f"⛺ Куплено {format(qty, f'.{base_precision}f')} {base_coin} по ціні {format(price, '.2f')} {quote_coin},"
+                message += f" що становить {format(qty * price, '.2f')} {quote_coin}."
+                message += f" Додатково комісія склала {format(fee * price, '.2f')} {quote_coin}."
                 message += f" Ордер на покупку {pos['order_id']} було розміщено {pos['date']}."
                 log(message)
 
                 # Записуємо в лог-файл
-                log_trade(pos, "BUY", exec_price)
+                log_trade(pos, "BUY", price)
 
                 # Оповіщаємо в Telegram
                 send_telegram(message)
@@ -610,7 +620,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
                 log(f"❎ Ордер {order_data['orderId']} скасовано або відхилено, статус: {status}")
                 break
             else:
-                log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status}")
+                log(f"❎ Ордер {order_data['orderId']} не виконано, статус: {status} (спроба {i+1} з {RETRY_NUMBER})")
                 continue
 
         if not is_filled:
@@ -728,7 +738,7 @@ def main():
         worker_stop_event.set()
         worker_thread.join()
         log("⚫ Бот зупинено")
-        log(empty_line=True)
+        log(empty_line=True, console_output=False)
 
 # Точка входу
 if __name__ == "__main__":
