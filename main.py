@@ -37,6 +37,7 @@ LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для
 LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
 
 # Статичні налаштування
+ORDER_MARKER = "gridmaton"
 FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 TRADE_LOG_FILE = "trade.log"
@@ -124,7 +125,8 @@ def load_positions(force_api=True, balance_correction_qty=0):
                     symbol=SYMBOL,
                     limit=50,
                     status="Filled",
-                    execType="Trade"
+                    execType="Trade",
+                    orderLinkId=ORDER_MARKER
                 )
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
@@ -345,7 +347,9 @@ def check_and_execute_sell(current_price):
                     symbol=SYMBOL,
                     side="Sell",
                     orderType="Market",
-                    qty=format(needed_qty, f'.{base_precision}f')
+                    qty=format(needed_qty, f'.{base_precision}f'),
+                    orderLinkId=ORDER_MARKER,
+                    isLeverage=0
                 )
                 if order.get('retCode') != 0:
                     log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -545,7 +549,9 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             symbol=SYMBOL,
             side="Buy",
             orderType="Market",
-            qty=str(ORDER_SIZE) # Для Spot Market Buy вказується сума в USDT
+            qty=str(ORDER_SIZE), # Вказується в котирувальній монеті
+            orderLinkId=ORDER_MARKER,
+            isLeverage=0
         )
         if order.get('retCode') != 0:
             log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
