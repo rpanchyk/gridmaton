@@ -29,19 +29,19 @@ TELEGRAM_NOTIFICATIONS = os.getenv("TELEGRAM_NOTIFICATIONS", 'False').lower() in
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN') # Токен бота Telegram
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID') # Ідентифікатор чату Telegram
 DEMO_MODE = os.getenv('DEMO_MODE', 'False').lower() in ('true', '1') # Режим демо
-SYMBOL = os.getenv('SYMBOL', 'BTCUSDT').upper() # Торгова пара
 GRID_TYPE = GridType[os.getenv('GRID_TYPE', 'LINEAR').upper()] # Тип сітки для набору позицій
+SYMBOL = os.getenv('SYMBOL', 'BTCUSDT').upper() # Торгова пара
 ORDER_SIZE = float(os.getenv('ORDER_SIZE', '10')) # Сума в котирувальній монеті для покупки
 PROFIT_TARGET = float(os.getenv('PROFIT_TARGET', '1000')) # Зміна ціни для продажу
 LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для купівлі
 LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
 
 # Статичні налаштування
-FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]
 POSITIONS_FILE = "positions.json"
 STATS_LOG_FILE = "stats.log"
 TRADE_LOG_FILE = "trade.log"
 WORK_LOG_FILE = "work.log"
+FIBO_NUMBERS = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144] # Послідовність Фіббоначі
 RETRY_COUNT = 10 # Кількість спроб
 RETRY_DELAY_SECONDS = 3 # Затримка між спробами (у секундах)
 TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
