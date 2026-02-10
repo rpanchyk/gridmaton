@@ -74,7 +74,7 @@ def load_instruments_info():
     # Отримання інформації про символ
     instrument_info = session.get_instruments_info(category="spot", symbol=SYMBOL)
     if not instrument_info['result']['list']:
-        raise ValueError("Невірний символ або відсутня інформація про нього.")
+        raise ValueError("Невірний символ або відсутня інформація про нього")
 
     info = instrument_info['result']['list'][0]
 
@@ -135,12 +135,24 @@ def load_positions(force_api=True):
                 # Отримуємо інформацію про ордери з історії
                 trades = history['result']['list']
                 log(f"⛽ Отримано {len(trades)} ордерів з історії")
+                # with open("trades.json", "w") as f:
+                #     json.dump(trades, f, indent=4)
 
-                # Фільтрація та сортування купівельних ордерів
+                # Фільтрація та сортування ордерів на покупку
                 buys = [t for t in trades if t['side'] == 'Buy']
-                buys.sort(key=lambda x: x['createdTime'], reverse=True)  # Сортуємо за часом створення
+                buys.sort(key=lambda x: x['createdTime'], reverse=True) # Сортуємо за часом створення
                 # with open("buys.json", "w") as f:
                 #     json.dump(buys, f, indent=4)
+
+                # Фільтрація та сортування ордерів на продаж
+                sells = [t for t in trades if t['side'] == 'Sell']
+                sells.sort(key=lambda x: x['createdTime'], reverse=True) # Сортуємо за часом створення
+                # with open("sells.json", "w") as f:
+                #     json.dump(sells, f, indent=4)
+
+                # Отримуєм список закритих ордерів на покупку (ордер на продаж перекрив раніше відкритий ордер на покупку)
+                executed = [t['orderLinkId'] for t in sells]
+                log(f"⛽ Закриті ордери на покупку: {executed}")
 
                 # Отримання балансу гаманця
                 _, equity_qty, _ = get_wallet_balance()
@@ -150,6 +162,10 @@ def load_positions(force_api=True):
                 if equity_qty > 0:
                     log("➰ Формування позицій з історії ордерів розпочато")
                     for b in buys:
+                        if f"BUY_{b['orderId']}" in executed:
+                            log(f"⚠️ Ордер {b['orderId']} вже закрито відповідним ордером на продаж, пропускаємо")
+                            continue
+
                         log(f"➰ Залишковий розрахований еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}", end="")
                         log(f" ({format(equity_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
 
@@ -189,7 +205,7 @@ def load_positions(force_api=True):
         if active_positions:
             log(f"✨ Активні позиції ({len(active_positions)} шт): {active_positions}")
         else:
-            log("⚠️ Позицій для відновлення не знайдено")
+            log("✨ Позицій для відновлення не знайдено")
 
 def get_wallet_balance(log_output=True):
     """
@@ -367,7 +383,8 @@ def check_and_execute_sell(current_price):
                     symbol=SYMBOL,
                     side="Sell",
                     orderType="Market",
-                    qty=format(needed_qty, f'.{base_precision}f')
+                    qty=format(needed_qty, f'.{base_precision}f'),
+                    orderLinkId=f"BUY_{pos['order_id']}"
                 )
                 if order.get('retCode') != 0:
                     log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -381,7 +398,7 @@ def check_and_execute_sell(current_price):
                 for _ in range(RETRY_COUNT):
                     time.sleep(RETRY_DELAY_SECONDS) # Затримка перед перевіркою
 
-                    log(f"⛽ Отримання історії ордерів для ордеру на продаж {order_id} ...")
+                    log(f"⛽ Отримання історії ордерів для ордеру на продаж {order_id}...")
                     history = session.get_order_history(
                         category="spot",
                         symbol=SYMBOL,
@@ -581,7 +598,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
         for i in range(RETRY_COUNT):
             time.sleep(RETRY_DELAY_SECONDS) # Затримка перед перевіркою
 
-            log(f"⛽ Отримання історії ордерів для ордеру на покупку {order_id} ...")
+            log(f"⛽ Отримання історії ордерів для ордеру на покупку {order_id}...")
             history = session.get_order_history(
                 category="spot",
                 symbol=SYMBOL,
@@ -711,7 +728,7 @@ def log_stats(log_output=False, telegram_output=True):
             message += f"- {pos['price']} ({format(float(pos['qty']), f'.{base_precision}f')} {base_coin}"
             message += f" / {format(float(pos['qty']) * float(pos['price']) - 0.4, '.1f')} {quote_coin})"
     else:
-        message += "✨ Активних позицій немає."
+        message += "✨ Активних позицій немає"
 
     # Логування
     if log_output:
@@ -730,7 +747,7 @@ def send_telegram(message):
         return
 
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        log("❌ Telegram токен або чат ID не встановлено.")
+        log("❌ Telegram токен або чат ID не встановлено")
         return
 
     try:
@@ -752,7 +769,7 @@ def main():
     # Ініціалізація сесії API
     try:
         log("⛅ Підключення до біржі ", end="")
-        session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET)
+        session = HTTP(testnet=False, demo=DEMO_MODE, api_key=API_KEY, api_secret=API_SECRET, recv_window=10000)
         log("виконано успішно", datetime_prefix=False)
     except Exception as e:
         log(f"❌ завершено з помилкою: {e}")

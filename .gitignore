@@ -1,5 +1,7 @@
 .env
 buys.json
+sells.json
+trades.json
 positions.json
 stats.log
 trade.log
