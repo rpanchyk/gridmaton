@@ -143,18 +143,22 @@ def load_positions(force_api=True):
                 #     json.dump(buys, f, indent=4)
 
                 # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance()
+                _, equity_qty, _ = get_wallet_balance()
 
                 # Відновлення позицій з історії ордерів
                 restored = []
-                if balance_qty > 0:
+                if equity_qty > 0:
                     log("➰ Формування позицій з історії ордерів розпочато")
-                    log(f"➰ Початковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}", end="")
-                    log(f" ({format(balance_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
                     for b in buys:
+                        log(f"➰ Залишковий розрахований еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}", end="")
+                        log(f" ({format(equity_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
+
                         qty = float(b['cumExecQty'])
                         fee = float(b['cumFeeDetail'][base_coin]) if base_coin in b['cumFeeDetail'] else 0
-                        if balance_qty >= qty and qty * last_price >= ORDER_SIZE:
+                        log(f"➰ Розмір ордеру: {format(qty, f'.{base_precision+2}f')} {base_coin}", end="")
+                        log(f" ({format(qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
+
+                        if equity_qty >= qty and equity_qty * last_price >= ORDER_SIZE:
                             restored.append({
                                 "order_id": b['orderId'],
                                 "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
@@ -163,14 +167,12 @@ def load_positions(force_api=True):
                                 "qty": format(qty - fee, f'.{base_precision+2}f'), # Віднімаємо комісію
                                 "fee": format(fee, f'.{base_precision+2}f')
                             })
-                            log(f"➰ Ордер {b['orderId']} додано в список позицій з історії ордерів")
+                            log(f"✨ Ордер {b['orderId']} додано в список позицій з історії ордерів")
 
-                            balance_qty -= qty
-                            log(f"➰ Залишковий розрахований баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}", end="")
-                            log(f" ({format(balance_qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
+                            equity_qty -= qty
                         else:
-                            log("➰ Формування позицій з історії ордерів завершено")
                             break
+                    log("➰ Формування позицій з історії ордерів завершено")
 
                 # Сортуємо за ціною (від більшої до меншої)
                 restored.sort(key=lambda x: float(x['price']), reverse=True)
