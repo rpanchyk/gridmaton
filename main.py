@@ -520,8 +520,8 @@ def get_next_upper_buy_level():
     :return: Розрахований рівень купівлі
     """
     max_price = max([float(p['price']) for p in active_positions]) if active_positions else None
-    price = max_price if max_price else last_price
-    level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET + LEVEL_STEP
+    price = max_price + LEVEL_STEP if max_price else last_price
+    level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
 
     return level
 
