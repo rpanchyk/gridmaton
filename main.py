@@ -152,7 +152,7 @@ def load_positions(force_api=True):
 
                 # Отримуєм список закритих ордерів на покупку (ордер на продаж перекрив раніше відкритий ордер на покупку)
                 executed = [t['orderLinkId'] for t in sells]
-                log(f"⛽ Закриті ордери на покупку: {executed}")
+                log(f"⛽ Закриті ордери на покупку ({len(executed)} шт): {executed}")
 
                 # Отримання балансу гаманця
                 _, equity_qty, _ = get_wallet_balance()
@@ -467,6 +467,10 @@ def check_and_execute_sell(current_price):
             except Exception as e:
                 log(f"❌ КРИТИЧНА ПОМИЛКА при продажі: {e}")
 
+                time.sleep(RETRY_DELAY_SECONDS) # Затримка перед можливою повторною спробою
+                log("⚠️ Додатково відновлюємо позиції...")
+                load_positions()
+
 def format_timedelta(timedelta):
     """
     Форматує timedelta об'єкт в читабельний формат.
@@ -664,6 +668,10 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
 
     except Exception as e:
         log(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
+
+        time.sleep(RETRY_DELAY_SECONDS) # Затримка перед можливою повторною спробою
+        log("⚠️ Додатково відновлюємо позиції...")
+        load_positions()
 
 def log(message="", end="\n", flush=False, empty_line=False, datetime_prefix=True, console_output=True, file_output=True):
     """
