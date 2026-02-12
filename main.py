@@ -64,6 +64,8 @@ last_price = 0 # Остання ціна символу
 accept_messages = True # Флаг для прийому повідомлень з WebSocket
 ticker_log_time = 0 # Останній час логування потоку тікерів
 stats_log_time = 0 # Останній час логування статистики
+critical_sells_count = 0
+critical_buys_count = 0
 
 def load_instruments_info():
     """
@@ -342,7 +344,7 @@ def check_and_execute_sell(current_price):
     Перевіряє активні позиції на досягнення цільового рівня прибутку та виконує продаж.
     :param current_price: Поточна ціна для порівняння з рівнями продажу
     """
-    global last_price
+    global last_price, critical_sells_count, accept_messages
 
     for pos in active_positions:
         sell_price = float(pos['price']) + PROFIT_TARGET
@@ -464,8 +466,17 @@ def check_and_execute_sell(current_price):
                 if not is_filled:
                     log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не підтверджено")
 
+                critical_sells_count = 0
             except Exception as e:
                 log(f"❌ КРИТИЧНА ПОМИЛКА при продажі: {e}")
+
+                # Збільшуємо лічильник критичних помилок і завершуємо роботу, якщо досягнуто ліміт
+                critical_sells_count += 1
+                if critical_sells_count >= RETRY_COUNT:
+                    accept_messages = False
+                    send_telegram(f"❌ Критична помилка при продажі, бот зупинено: {e}")
+                    log("❌ Бот зупинено")
+                    sys.exit(1)
 
                 time.sleep(RETRY_DELAY_SECONDS) # Затримка перед можливою повторною спробою
                 log("⚠️ Додатково відновлюємо позиції...")
@@ -553,7 +564,7 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     :param lower_buy_level: Нижній рівень купівлі
     :param upper_buy_level: Верхній рівень купівлі
     """
-    global last_price
+    global last_price, critical_buys_count, accept_messages
 
     # Визначення рівня купівлі, який було перетнуто
     level = None
@@ -666,8 +677,17 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
         if not is_filled:
             log(f"❎ Ордер {order_data['orderId']} розміщено, але статус 'Filled' не підтверджено")
 
+        critical_buys_count = 0 # Скидаємо лічильник критичних помилок
     except Exception as e:
         log(f"❌ КРИТИЧНА ПОМИЛКА при купівлі: {e}")
+
+        # Збільшуємо лічильник критичних помилок і завершуємо роботу, якщо досягнуто ліміт
+        critical_buys_count += 1
+        if critical_buys_count >= RETRY_COUNT:
+            accept_messages = False
+            send_telegram(f"❌ Критична помилка при купівлі, бот зупинено: {e}")
+            log("❌ Бот зупинено")
+            sys.exit(1)
 
         time.sleep(RETRY_DELAY_SECONDS) # Затримка перед можливою повторною спробою
         log("⚠️ Додатково відновлюємо позиції...")
