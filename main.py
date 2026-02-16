@@ -157,7 +157,7 @@ def load_positions(force_api=True):
                 log(f"⛽ Закриті ордери на покупку ({len(executed)} шт): {executed}")
 
                 # Отримання балансу гаманця
-                _, equity_qty, _ = get_wallet_balance()
+                _, _, _, equity_qty, _ = get_wallet_balance()
 
                 # Відновлення позицій з історії ордерів
                 restored = []
@@ -220,19 +220,24 @@ def get_wallet_balance(log_output=True):
     balance_info = session.get_wallet_balance(accountType="UNIFIED", coin=base_coin)
     if balance_info.get('retCode') != 0:
         raise ValueError(f"❌ Помилка отримання балансу: {balance_info.get('retMsg')}")
+    if not 'result' in balance_info or not 'list' in balance_info['result'] or not balance_info['result']['list']:
+        raise ValueError("❌ Невірний формат відповіді або відсутній баланс гаманця")
     # log(f"⛳ Інформацію про баланс отримано: {json.dumps(balance_info, indent=4)}")
 
+    total_balance = float(balance_info['result']['list'][0]['totalWalletBalance'])
+    total_equity = float(balance_info['result']['list'][0]['totalEquity'])
     balance_qty = float(balance_info['result']['list'][0]['coin'][0]['walletBalance'])
     equity_qty = float(balance_info['result']['list'][0]['coin'][0]['equity'])
     usd_value = float(balance_info['result']['list'][0]['coin'][0]['usdValue'])
 
     if log_output:
-        message = f"⛳ Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin}"
-        message += f" (${format(usd_value, '.2f')})"
-        message += f", еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}"
+        message = f"⛳ Загальний баланс: ${format(total_balance, '.2f')}"
+        message += f", загальний еквіті: ${format(total_equity, '.2f')}"
+        message += f", баланс {base_coin}: {format(balance_qty, f'.{base_precision+2}f')} (${format(usd_value, '.2f')})"
+        message += f", еквіті {base_coin}: {format(equity_qty, f'.{base_precision+2}f')}"
         log(message)
 
-    return balance_qty, equity_qty, usd_value
+    return total_balance, total_equity, balance_qty, equity_qty, usd_value
 
 def handle_message(message):
     """
@@ -353,7 +358,7 @@ def check_and_execute_sell(current_price):
                 log(f"⚾ Ціна {current_price:.2f} досягла рівня продажу {sell_price:.2f} для позиції купівлі по {pos['price']} для ордеру {pos['order_id']}")
 
                 # Отримання балансу гаманця
-                balance_qty, _, _ = get_wallet_balance()
+                _, _, balance_qty, _, _ = get_wallet_balance()
 
                 # Округлюємо кількість ВНИЗ до потрібної точності
                 factor = 10 ** base_precision
@@ -742,10 +747,13 @@ def log_stats(log_output=False, telegram_output=True):
     message = ""
 
     # Статистика рахунку
-    balance_qty, equity_qty, usd_value = get_wallet_balance(log_output=False)
+    total_balance, total_equity, balance_qty, equity_qty, usd_value = get_wallet_balance(log_output=False)
     message += "⛳ Статистика рахунку:\n"
-    message += f"Баланс: {format(balance_qty, f'.{base_precision+2}f')} {base_coin} (${format(usd_value, '.2f')})\n"
-    message += f"Еквіті: {format(equity_qty, f'.{base_precision+2}f')} {base_coin}\n"
+    message += f"Загальний баланс: ${format(total_balance, '.2f')}\n"
+    message += f"Загальний еквіті: ${format(total_equity, '.2f')}\n"
+    message += "\n"
+    message += f"Баланс {base_coin}: {format(balance_qty, f'.{base_precision+2}f')} (${format(usd_value, '.2f')})\n"
+    message += f"Еквіті {base_coin}: {format(equity_qty, f'.{base_precision+2}f')}\n"
     message += "\n"
 
     # Активні позиції
