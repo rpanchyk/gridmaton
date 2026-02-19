@@ -136,7 +136,7 @@ def load_positions(force_api=True):
 
                 # Отримуємо інформацію про ордери з історії
                 trades = history['result']['list']
-                log(f"⛽ Отримано {len(trades)} ордерів з історії")
+                log(f"⛽ Отримано {len(trades)} ордерів з історії: {trades}")
                 # with open("trades.json", "w") as f:
                 #     json.dump(trades, f, indent=4)
 
@@ -535,15 +535,17 @@ def get_next_lower_buy_level():
             if count < curr:
                 diff = curr - prev
                 if diff > 1:
-                    last_position = min(active_positions, key=lambda x: float(x['price'])) # Отримуємо позицію з найменшою ціною
-                    last_position_level = (float(last_position['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
-                    level = last_position_level - LEVEL_STEP * diff # Зсув рівня вниз
+                    p = min(active_positions, key=lambda x: float(x['price'])) # Отримуємо позицію з найменшою ціною
+                    # p_level = (float(last_position['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+                    p_level = get_nearest_level(float(p['price']), LEVEL_STEP) + LEVEL_OFFSET
+                    level = p_level - LEVEL_STEP * diff # Зсув рівня вниз
                 break
             prev = curr
 
     # Перевірка, чи є активна позиція на цьому рівні, і якщо так, зсув рівня вниз на крок
     for p in active_positions:
-        p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        # p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        p_level = get_nearest_level(float(p['price']), LEVEL_STEP) + LEVEL_OFFSET
         if math.isclose(level, p_level):
             level -= LEVEL_STEP # Зсув рівня вниз
             # log(f"Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита, зсув рівня до {level}")
@@ -561,6 +563,12 @@ def get_next_upper_buy_level():
     level = (price // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET + LEVEL_STEP
 
     return level
+
+def get_nearest_level(price, step):
+    value = price / step
+    floored = math.floor(value)
+    ceiled = math.ceil(value)
+    return (floored if math.fabs(value - floored) < math.fabs(value - ceiled) else ceiled) * step
 
 def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
     """
@@ -590,7 +598,8 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
 
     # Перевірка, чи є активна позиція на цьому рівні
     for p in active_positions:
-        p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        # p_level = (float(p['price']) // LEVEL_STEP) * LEVEL_STEP + LEVEL_OFFSET
+        p_level = get_nearest_level(float(p['price']), LEVEL_STEP) + LEVEL_OFFSET
         log(f"❔ Перевірка позиції з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level}")
         if math.isclose(level, p_level):
             log(f"⚠️ Позиція з ордером {p['order_id']} по ціні {p['price']} на рівні {p_level} вже була відкрита {p['date']}")
