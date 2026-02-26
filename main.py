@@ -136,9 +136,12 @@ def load_positions(force_api=True):
 
                 # Отримуємо інформацію про ордери з історії
                 trades = history['result']['list']
-                log(f"⛽ Отримано {len(trades)} ордерів з історії: {trades}")
-                # with open("trades.json", "w") as f:
-                #     json.dump(trades, f, indent=4)
+                if not trades:
+                    log("⛽ Історія ордерів порожня")
+                else:
+                    log(f"⛽ Отримано {len(trades)} ордерів з історії: {trades}")
+                    # with open("trades.json", "w") as f:
+                    #     json.dump(trades, f, indent=4)
 
                 # Фільтрація та сортування ордерів на покупку
                 buys = [t for t in trades if t['side'] == 'Buy']
@@ -154,7 +157,8 @@ def load_positions(force_api=True):
 
                 # Отримуєм список закритих ордерів на покупку (ордер на продаж перекрив раніше відкритий ордер на покупку)
                 executed = [t['orderLinkId'] for t in sells]
-                log(f"⛽ Закриті ордери на покупку ({len(executed)} шт): {executed}")
+                if executed:
+                    log(f"⛽ Закриті ордери на покупку ({len(executed)} шт): {executed}")
 
                 # Отримання балансу гаманця
                 _, _, _, equity_qty, _ = get_wallet_balance()
