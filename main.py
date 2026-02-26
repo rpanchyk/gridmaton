@@ -853,7 +853,15 @@ def main():
                 time.sleep(1)
 
         except KeyboardInterrupt:
-            log("⚠️ Отримано сигнал зупинки бота")
+            log("⚠️ Отримано сигнал зупинки від користувача")
+
+            while not data_queue.empty():
+                try:
+                    item = data_queue.get_nowait()
+                    log(f"➖ Повідомлення видалено з черги: {item}")
+                    data_queue.task_done()
+                except queue.Empty as e:
+                    log(f"❌ Помилка очищення черги: {e}")
 
             # Зупинка робочого потоку
             worker_stop_event.set()
