@@ -838,7 +838,7 @@ def main():
     # Ініціалізація веб-сокета для отримання тікерів
     try:
         log("⛅ Підписка на стрім тікерів ", end="")
-        ws = WebSocket(testnet=False, channel_type="spot", api_key=API_KEY, api_secret=API_SECRET)
+        ws = WebSocket(testnet=False, channel_type="spot")
         ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
         log("виконано успішно", datetime_prefix=False)
     except Exception as e:
