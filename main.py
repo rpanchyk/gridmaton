@@ -835,25 +835,40 @@ def main():
     worker_thread.start()
     log("⚙️ Робочий потік запущено")
 
-    # Ініціалізація веб-сокета для отримання тікерів
-    try:
-        log("⛅ Підписка на стрім тікерів ", end="")
-        ws = WebSocket(testnet=False, channel_type="spot")
-        ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
-        log("виконано успішно", datetime_prefix=False)
-    except Exception as e:
-        log(f"❌ завершено з помилкою: {e}")
-        return
+    while True:
+        try:
+            # Ініціалізація веб-сокета для отримання тікерів
+            log("⛅ Підписка на стрім тікерів ", end="")
+            ws = WebSocket(testnet=False, channel_type="spot")
+            ws.ticker_stream(symbol=SYMBOL, callback=handle_message)
+            log("виконано успішно", datetime_prefix=False)
 
-    # Утримання програми в активному стані
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        worker_stop_event.set()
-        worker_thread.join()
-        log("⚫ Бот зупинено")
-        log(empty_line=True, console_output=False)
+            # Утримання програми в активному стані
+            while True:
+                time.sleep(1)
+
+        except KeyboardInterrupt:
+            log("⚠️ Отримано сигнал зупинки бота")
+
+            # Зупинка робочого потоку
+            worker_stop_event.set()
+            worker_thread.join()
+            while not worker_thread.is_alive():
+                log("⚙️ Робочий потік зупинено")
+                break
+
+            log("⚫ Бот зупинено")
+            log(empty_line=True, console_output=False)
+
+            # Завершення програми
+            return
+
+        except Exception as e:
+            log(f"❌ Помилка веб-сокета: {e}")
+            log("⚠️ Пеезапуск веб-сокета")
+
+            # Очікування перед перезапуском
+            time.sleep(5)
 
 # Точка входу
 if __name__ == "__main__":
