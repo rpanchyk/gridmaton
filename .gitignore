@@ -2,6 +2,7 @@
 buys.json
 sells.json
 trades.json
+history.json
 positions.json
 stats.log
 trade.log

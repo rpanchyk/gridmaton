@@ -39,6 +39,7 @@ LEVEL_STEP = float(os.getenv('LEVEL_STEP', '1000')) # Крок рівня для
 LEVEL_OFFSET = float(os.getenv('LEVEL_OFFSET', '500')) # Зміщення рівня для купівлі
 
 # Статичні налаштування
+HISTORY_FILE = "history.json"
 POSITIONS_FILE = "positions.json"
 STATS_LOG_FILE = "stats.log"
 TRADE_LOG_FILE = "trade.log"
@@ -48,6 +49,8 @@ RETRY_COUNT = 10 # Кількість спроб
 RETRY_DELAY_SECONDS = 3 # Затримка між спробами (у секундах)
 TICKER_LOG_INTERVAL_MINS = 10 # Інтервал логування потоку тікерів
 STATS_LOG_INTERVAL_MINS = 60 * 24 # Інтервал логування статистики
+MS_IN_DAY = 24 * 60 * 60 * 1000
+MS_IN_7_DAYS = 7 * MS_IN_DAY
 
 # Перевірка наявності ключів API
 if not API_KEY or not API_SECRET:
@@ -126,40 +129,26 @@ def load_positions(force_api=True):
             log("⚡ Відновлення позицій з API...")
             try:
                 log("⛽ Отримання історії ордерів...")
-                history = session.get_order_history(
-                    category="spot",
-                    symbol=SYMBOL,
-                    limit=50,
-                    orderStatus="Filled"
-                )
-                if history.get('retCode') != 0:
-                    raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
-
-                # Отримуємо інформацію про ордери з історії
-                trades = history['result']['list']
+                trades = get_full_history(180)
                 if not trades:
                     log("⛽ Історія ордерів порожня")
                 else:
-                    log(f"⛽ Отримано {len(trades)} ордерів з історії: {trades}")
-                    # with open("trades.json", "w") as f:
-                    #     json.dump(trades, f, indent=4)
+                    log(f"⛽ Отримано {len(trades)} ордерів з історії")
 
-                # Фільтрація та сортування ордерів на покупку
+                # Фільтрація ордерів на покупку
                 buys = [t for t in trades if t['side'] == 'Buy']
-                buys.sort(key=lambda x: x['createdTime'], reverse=True) # Сортуємо за часом створення
                 # with open("buys.json", "w") as f:
                 #     json.dump(buys, f, indent=4)
 
-                # Фільтрація та сортування ордерів на продаж
+                # Фільтрація ордерів на продаж
                 sells = [t for t in trades if t['side'] == 'Sell']
-                sells.sort(key=lambda x: x['createdTime'], reverse=True) # Сортуємо за часом створення
                 # with open("sells.json", "w") as f:
                 #     json.dump(sells, f, indent=4)
 
                 # Отримуєм список закритих ордерів на покупку (ордер на продаж перекрив раніше відкритий ордер на покупку)
                 executed = [t['orderLinkId'] for t in sells]
                 if executed:
-                    log(f"⛽ Перекриті ордери на покупку ({len(executed)} шт): {executed}")
+                    log(f"⛽ Перекриті ордери на покупку ({len(executed)} шт): {executed[:20]}...")
 
                 # Отримання балансу гаманця
                 _, _, _, equity_qty, _ = get_wallet_balance()
@@ -216,6 +205,97 @@ def load_positions(force_api=True):
             log(f"✨ Активні позиції ({len(active_positions)} шт): {active_positions}")
         else:
             log("✨ Позицій для відновлення не знайдено")
+
+def get_full_history(days):
+    history_trades = []
+    if os.path.exists(HISTORY_FILE):
+        log("⛽ Отримання історії ордерів з файлу...")
+        try:
+            with open(HISTORY_FILE, "r") as f:
+                history_trades = json.load(f)
+            log(f"⛽ Отримано {len(history_trades)} ордерів з файлу")
+        except Exception as e:
+            log(f"❌ Помилка: {e}")
+
+    last_trade_time = 0
+    if history_trades:
+        last_trade_time = float(history_trades[0]['createdTime'])
+    log(f"⛽ Дата останнього ордеру: {datetime.fromtimestamp(last_trade_time/1000).strftime('%Y-%m-%d %H:%M:%S')}")
+
+    current_time = int(time.time() * 1000)
+    target_start_time = current_time - (days * MS_IN_DAY)
+
+    # Починаємо з останніх 7 днів і рухаємося назад
+    temp_end_time = current_time
+    temp_start_time = temp_end_time - MS_IN_7_DAYS
+
+    all_trades = []
+    stop = False
+    while temp_end_time > target_start_time:
+        log(f"⛽ Запит періоду: ", end="")
+        log(f"{datetime.fromtimestamp(temp_start_time/1000).strftime('%Y-%m-%d %H:%M:%S')} - ", datetime_prefix=False, end="")
+        log(f"{datetime.fromtimestamp(temp_end_time/1000).strftime('%Y-%m-%d %H:%M:%S')}", datetime_prefix=False)
+
+        cursor = None
+        while True:
+            response = session.get_order_history(
+                category="spot",
+                symbol=SYMBOL,
+                limit=50,
+                orderStatus="Filled",
+                startTime=max(temp_start_time, target_start_time),
+                endTime=temp_end_time,
+                cursor=cursor
+            )
+            if response.get('retCode') != 0:
+                raise ValueError(f"❌ Помилка отримання історії ордерів: {response.get('retMsg')}")
+
+            result = response.get('result', {})
+
+            # Додавання усіх ордерів до списку
+            trades = result.get('list', [])
+            if trades:
+                # Сортуємо за датою (від нових до старих)
+                trades.sort(key=lambda x: x['createdTime'], reverse=True)
+
+                # Залишаємо тільки нові ордери, що знаходяться після останнього ордера з історії
+                for trade in trades:
+                    if float(trade['createdTime']) <= last_trade_time:
+                        stop = True
+                        break
+                    all_trades.append(trade)
+
+            # Ордери з історії синхронізовані
+            if stop:
+                break
+
+            # Перевіряємо, чи є наступна сторінка
+            cursor = result.get('nextPageCursor')
+            if not cursor:
+                break
+
+            # Невеликий sleep, щоб не отримати бан за ліміт запитів (Rate Limit)
+            time.sleep(0.25)
+
+        # Зсуваємо вікно на 7 днів назад
+        temp_end_time = temp_start_time
+        temp_start_time -= MS_IN_7_DAYS
+
+        # Ордери з історії синхронізовані
+        if stop:
+            break
+
+    # Додавання усіх ордерів з файлу історії
+    all_trades.extend(history_trades)
+
+    # Сортуємо за датою створення (від нових до старих)
+    all_trades.sort(key=lambda x: x['createdTime'], reverse=True)
+
+    # Збереження історії у файл
+    with open("history.json", "w") as f:
+        json.dump(all_trades, f, indent=4)
+
+    return all_trades
 
 def get_wallet_balance(log_output=True):
     """

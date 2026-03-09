@@ -133,12 +133,14 @@ cat trade.log
 - **.env** - API credentials and configuration (create from .env.example)
 - **.env.example** - Example environment configuration file
 - **.gitignore** - Git ignore file to exclude sensitive files
+- **history.json** - History of orders (auto-managed)
 - **LICENSE** - License information for the project
 - **logo.png** - Bot logo image
 - **main.py** - Main bot application with trading logic
 - **positions.json** - Current active trading positions (auto-managed)
 - **README.md** - This documentation
 - **requirements.txt** - Python package dependencies
+- **stats.log** - Last time of statistics update (auto-managed)
 - **trade.log** - Historical record of all executed trades (auto-managed)
 - **work.log** - Operational log for monitoring (auto-managed)
 
