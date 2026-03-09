@@ -5,14 +5,16 @@ import math
 import json
 import os
 import queue
+import random
 import requests
+import string
 import threading
 from dotenv import load_dotenv
 from enum import Enum
 from pybit.unified_trading import HTTP, WebSocket
 
 # Сумісні іконки для консолі:
-# ☔☕♈♉♊♋♌♍♎♏♐♑♒♓⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⚙️⚠️ℹ️➡️
+# ♈♉♊♋♌♍♎♏♐♑♒♓☔☕⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛲⛳⛵⛺⛽✅✊✋✨❌❎❓❔❕❗➕➖➗➰➿⚙️⚠️ℹ️➡️
 
 # Перелік типів сітки
 class GridType(Enum):
@@ -128,8 +130,7 @@ def load_positions(force_api=True):
                     category="spot",
                     symbol=SYMBOL,
                     limit=50,
-                    status="Filled",
-                    execType="Trade"
+                    orderStatus="Filled"
                 )
                 if history.get('retCode') != 0:
                     raise ValueError(f"❌ Помилка отримання історії ордерів: {history.get('retMsg')}")
@@ -158,7 +159,7 @@ def load_positions(force_api=True):
                 # Отримуєм список закритих ордерів на покупку (ордер на продаж перекрив раніше відкритий ордер на покупку)
                 executed = [t['orderLinkId'] for t in sells]
                 if executed:
-                    log(f"⛽ Закриті ордери на покупку ({len(executed)} шт): {executed}")
+                    log(f"⛽ Перекриті ордери на покупку ({len(executed)} шт): {executed}")
 
                 # Отримання балансу гаманця
                 _, _, _, equity_qty, _ = get_wallet_balance()
@@ -180,7 +181,10 @@ def load_positions(force_api=True):
                         log(f"➰ Розмір ордеру: {format(qty, f'.{base_precision+2}f')} {base_coin}", end="")
                         log(f" ({format(qty * last_price, '.2f')} {quote_coin})", datetime_prefix=False)
 
-                        if equity_qty >= qty and equity_qty * last_price >= ORDER_SIZE:
+                        linkId = b['orderLinkId']
+                        log(f"➰ Кастомний ідентифікатор ордеру: {linkId}")
+
+                        if equity_qty >= qty and (linkId.startswith("BOT_") or equity_qty * last_price >= 10): # TODO: тимчасово 10 USDT, після продажу на 75к - видалити
                             restored.append({
                                 "order_id": b['orderId'],
                                 "date": datetime.fromtimestamp(int(b['createdTime'])/1000).strftime("%Y-%m-%d %H:%M:%S"),
@@ -618,7 +622,8 @@ def check_and_execute_buy(current_price, lower_buy_level, upper_buy_level):
             symbol=SYMBOL,
             side="Buy",
             orderType="Market",
-            qty=str(ORDER_SIZE) # Вказується в котирувальній монеті
+            qty=str(ORDER_SIZE), # Вказується в котирувальній монеті
+            orderLinkId=f"BOT_{''.join(random.choices(string.digits, k=20))}"
         )
         if order.get('retCode') != 0:
             log(f"❌ Помилка розміщення ордеру: {order.get('retMsg')}")
@@ -814,7 +819,7 @@ def main():
     """
     global session, last_price
 
-    log(f"⚪ Бот запущений та готовий до роботи")
+    log(f"⚪ Бот запущено")
 
     # Ініціалізація сесії API
     try:
